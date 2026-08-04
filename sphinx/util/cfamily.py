@@ -69,8 +69,8 @@ float_literal_re = re.compile(
     """,
     flags=re.VERBOSE,
 )
-float_literal_suffix_re = re.compile(r'[fFlL]\b')
-# the ending word boundary is important for distinguishing between suffixes and UDLs in C++
+float_literal_suffix_re = re.compile(r'[fFlL](?![a-zA-Z0-9_])')
+# only standalone built-in suffixes are allowed here; otherwise treat it as a UDL suffix
 char_literal_re = re.compile(
     r"""
     ((?:u8)|u|U|L)?
