@@ -1019,6 +1019,51 @@ def test_toctree_index(app):
         entries=[(None, 'genindex'), (None, 'modindex'), (None, 'search')],
     )
 
+    resolved_toctree = global_toctree_for_doc(
+        app.env,
+        'index',
+        app.builder,
+        tags=app.tags,
+    )
+    assert resolved_toctree is not None
+    assert_node(
+        resolved_toctree,
+        [
+            compact_paragraph,
+            (
+                bullet_list,
+                title,
+                bullet_list,
+            ),
+        ],
+    )
+    assert_node(
+        extract_node(resolved_toctree, 0, 0, 0, 0),
+        reference,
+        refuri='foo',
+    )
+    assert_node(
+        extract_node(resolved_toctree, 2, 0, 0, 0),
+        reference,
+        refuri='genindex',
+    )
+    assert extract_node(resolved_toctree, 2, 0, 0, 0, 0) == nodes.Text('Index')
+    assert_node(
+        extract_node(resolved_toctree, 2, 1, 0, 0),
+        reference,
+        refuri='py-modindex',
+    )
+    assert (
+        extract_node(resolved_toctree, 2, 1, 0, 0, 0)
+        == nodes.Text('Module Index')
+    )
+    assert_node(
+        extract_node(resolved_toctree, 2, 2, 0, 0),
+        reference,
+        refuri='search',
+    )
+    assert extract_node(resolved_toctree, 2, 2, 0, 0, 0) == nodes.Text('Search Page')
+
 
 @pytest.mark.sphinx('dummy', testroot='toctree-only')
 def test_toctree_only(app):
