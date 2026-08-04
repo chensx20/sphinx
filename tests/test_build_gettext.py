@@ -8,6 +8,7 @@ from subprocess import PIPE, CalledProcessError
 
 import pytest
 
+from sphinx.builders.gettext import Catalog, MsgOrigin
 from sphinx.util.osutil import cd
 
 
@@ -25,6 +26,19 @@ def test_build_gettext(app):
     # regression test for issue #960
     catalog = (app.outdir / 'markup.pot').read_text(encoding='utf8')
     assert 'msgid "something, something else, something more"' in catalog
+
+
+def test_Catalog_duplicated_message():
+    catalog = Catalog()
+    catalog.add('message', MsgOrigin('source-a', 10))
+    catalog.add('message', MsgOrigin('source-a', 10))
+    catalog.add('message', MsgOrigin('source-b', -1))
+    catalog.add('message', MsgOrigin('source-b', -1))
+    catalog.add('message', MsgOrigin('source-a', 11))
+
+    message = next(iter(catalog))
+    assert message.locations == [('source-a', 10), ('source-b', -1), ('source-a', 11)]
+    assert len(message.uuids) == 5
 
 
 @pytest.mark.sphinx('gettext', srcdir='root-gettext')

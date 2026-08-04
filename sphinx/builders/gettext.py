@@ -57,8 +57,15 @@ class Catalog:
 
     def __iter__(self) -> Generator[Message, None, None]:
         for message in self.messages:
-            positions = [(source, line) for source, line, uuid in self.metadata[message]]
+            positions: List[Tuple[str, int]] = []
+            seen: Set[Tuple[str, int]] = set()
             uuids = [uuid for source, line, uuid in self.metadata[message]]
+            for source, line, uuid in self.metadata[message]:
+                position = (source, line)
+                if position in seen:
+                    continue
+                seen.add(position)
+                positions.append(position)
             yield Message(message, positions, uuids)
 
 
