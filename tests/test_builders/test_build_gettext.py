@@ -31,6 +31,8 @@ def test_Catalog_duplicated_message() -> None:
     catalog.add('hello', MsgOrigin('/path/to/filename', 1))
     catalog.add('hello', MsgOrigin('/path/to/filename', 1))
     catalog.add('hello', MsgOrigin('/path/to/filename', 2))
+    catalog.add('hello', MsgOrigin('/path/to/filename', -1))
+    catalog.add('hello', MsgOrigin('/path/to/filename', -1))
     catalog.add('hello', MsgOrigin('/path/to/yetanother', 1))
     catalog.add('world', MsgOrigin('/path/to/filename', 1))
 
@@ -41,6 +43,7 @@ def test_Catalog_duplicated_message() -> None:
     assert msg1.locations == [
         ('/path/to/filename', 1),
         ('/path/to/filename', 2),
+        ('/path/to/filename', -1),
         ('/path/to/yetanother', 1),
     ]
     assert msg2.text == 'world'

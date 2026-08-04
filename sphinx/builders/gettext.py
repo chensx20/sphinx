@@ -87,7 +87,14 @@ class Catalog:
 
     def __iter__(self) -> Iterator[Message]:
         for message, msg_metadata in self.metadata.items():
-            positions = sorted(set(map(operator.itemgetter(0, 1), msg_metadata)))
+            positions = []
+            seen: set[tuple[str, int]] = set()
+            for source, line, _uuid in msg_metadata:
+                position = (source, line)
+                if position in seen:
+                    continue
+                seen.add(position)
+                positions.append(position)
             uuids = list(map(operator.itemgetter(2), msg_metadata))
             yield Message(text=message, locations=positions, uuids=uuids)
 
