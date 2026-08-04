@@ -413,6 +413,93 @@ def test_autoclass_content_and_docstring_signature_both(app):
 
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_autoclass_content_and_docstring_signature_overloads(app):
+    options = {"members": None,
+               "undoc-members": None}
+
+    app.config.autoclass_content = 'class'
+    actual = do_autodoc(app, 'module', 'target.docstring_signature_overloads', options)
+    assert list(actual) == [
+        '',
+        '.. py:module:: target.docstring_signature_overloads',
+        '',
+        '',
+        '.. py:class:: OverloadedBoth(foo, bar)',
+        '   :module: target.docstring_signature_overloads',
+        '',
+        '   Class docstring.',
+        '',
+        '',
+        '.. py:class:: OverloadedClass(foo, bar)',
+        '   :module: target.docstring_signature_overloads',
+        '',
+        '   Class docstring.',
+        '',
+        '',
+        '.. py:class:: OverloadedInit()',
+        '   :module: target.docstring_signature_overloads',
+        '',
+    ]
+
+    app.config.autoclass_content = 'init'
+    actual = do_autodoc(app, 'module', 'target.docstring_signature_overloads', options)
+    assert list(actual) == [
+        '',
+        '.. py:module:: target.docstring_signature_overloads',
+        '',
+        '',
+        '.. py:class:: OverloadedBoth(foo, bar, baz, qux)',
+        '   :module: target.docstring_signature_overloads',
+        '',
+        '   Init docstring.',
+        '',
+        '',
+        '.. py:class:: OverloadedClass(foo, bar)',
+        '   :module: target.docstring_signature_overloads',
+        '',
+        '   Class docstring.',
+        '',
+        '',
+        '.. py:class:: OverloadedInit(foo, bar)',
+        '   :module: target.docstring_signature_overloads',
+        '',
+        '   Init docstring.',
+        '',
+    ]
+
+    app.config.autoclass_content = 'both'
+    actual = do_autodoc(app, 'module', 'target.docstring_signature_overloads', options)
+    assert list(actual) == [
+        '',
+        '.. py:module:: target.docstring_signature_overloads',
+        '',
+        '',
+        '.. py:class:: OverloadedBoth(foo, bar)',
+        '   :module: target.docstring_signature_overloads',
+        '',
+        '   Class docstring.',
+        '',
+        '   OverloadedBoth(foo, bar, baz)',
+        '   OverloadedBoth(foo, bar, baz, qux)',
+        '',
+        '   Init docstring.',
+        '',
+        '',
+        '.. py:class:: OverloadedClass(foo, bar)',
+        '   :module: target.docstring_signature_overloads',
+        '',
+        '   Class docstring.',
+        '',
+        '',
+        '.. py:class:: OverloadedInit(foo, bar)',
+        '   :module: target.docstring_signature_overloads',
+        '',
+        '   Init docstring.',
+        '',
+    ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
 def test_mocked_module_imports(app, warning):
     # no autodoc_mock_imports
     options = {"members": 'TestAutodoc,decoratedFunction,func'}

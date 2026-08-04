@@ -1049,24 +1049,32 @@ class DocstringSignatureMixin:
             # no lines in docstring, no match
             if not doclines:
                 continue
-            # match first line of docstring against signature RE
-            match = py_ext_sig_re.match(doclines[0])
-            if not match:
-                continue
-            exmod, path, base, args, retann = match.groups()
-            # the base name must match ours
             valid_names = [self.objpath[-1]]  # type: ignore
             if isinstance(self, ClassDocumenter):
                 valid_names.append('__init__')
                 if hasattr(self.object, '__mro__'):
                     valid_names.extend(cls.__name__ for cls in self.object.__mro__)
-            if base not in valid_names:
+
+            matches = []
+            for docline in doclines:
+                match = py_ext_sig_re.match(docline)
+                if not match:
+                    break
+
+                exmod, path, base, args, retann = match.groups()
+                if base not in valid_names:
+                    break
+
+                matches.append((args, retann))
+
+            if not matches:
                 continue
+
             # re-prepare docstring to ignore more leading indentation
             tab_width = self.directive.state.document.settings.tab_width  # type: ignore
-            self._new_docstrings[i] = prepare_docstring('\n'.join(doclines[1:]),
+            self._new_docstrings[i] = prepare_docstring('\n'.join(doclines[len(matches):]),
                                                         tabsize=tab_width)
-            result = args, retann
+            result = matches[-1]
             # don't look any further
             break
         return result
