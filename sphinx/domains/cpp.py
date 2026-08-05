@@ -883,13 +883,19 @@ class ASTNumberLiteral(ASTLiteral):
 class ASTStringLiteral(ASTLiteral):
     def __init__(self, data: str) -> None:
         self.data = data
+        self.prefix = None  # type: Optional[str]
+        if data[0] != '"':
+            quotePos = data.find('"')
+            self.prefix = data[:quotePos]
 
     def _stringify(self, transform: StringifyTransform) -> str:
         return self.data
 
     def get_id(self, version: int) -> str:
         # note: the length is not really correct with escaping
-        return "LA%d_KcE" % (len(self.data) - 2)
+        prefixLength = len(self.prefix) if self.prefix is not None else 0
+        typeId = _id_char_from_prefix[self.prefix]
+        return "LA%d_K%sE" % (len(self.data) - 2 - prefixLength, typeId)
 
     def describe_signature(self, signode: TextElement, mode: str,
                            env: "BuildEnvironment", symbol: "Symbol") -> None:
@@ -4667,9 +4673,14 @@ class DefinitionParser(BaseParser):
         return self.config.cpp_paren_attributes
 
     def _parse_string(self) -> str:
-        if self.current_char != '"':
-            return None
         startPos = self.pos
+        if self.current_char in 'LuU':
+            self.pos += 1
+            if self.current_char == '8' and self.definition[self.pos - 1] == 'u':
+                self.pos += 1
+        if self.current_char != '"':
+            self.pos = startPos
+            return None
         self.pos += 1
         escape = False
         while True:

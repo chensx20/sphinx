@@ -198,6 +198,7 @@ def test_expressions():
                        ('\\u0A42', '2626'), ('\\U0001f34c', '127820'), ('\\U0001F34C', '127820')]:
             exprCheck("{}'{}'_udl".format(p, c), 'clL_Zli4_udlE' + t + val + 'E')
     exprCheck('"abc"_udl', 'clL_Zli4_udlELA3_KcEE')
+    exprCheck('L"abc"_udl', 'clL_Zli4_udlELA3_KwEE')
     # from issue #7294
     exprCheck('6.62607015e-34q_J', 'clL_Zli3q_JEL6.62607015e-34EE')
 
