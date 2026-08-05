@@ -20,7 +20,7 @@ from inspect import (  # NOQA
     Parameter, isclass, ismethod, ismethoddescriptor
 )
 from io import StringIO
-from typing import Any, Callable, Mapping, List, Optional, Tuple
+from typing import Any, Callable, Mapping, List, Tuple
 from typing import cast
 
 from sphinx.deprecation import RemovedInSphinx40Warning, RemovedInSphinx50Warning
@@ -519,21 +519,22 @@ def signature_from_str(signature: str) -> inspect.Signature:
     # parameters
     args = definition.args
     params = []
+    positional_args = []
 
-    if hasattr(args, "posonlyargs"):
-        for arg in args.posonlyargs:  # type: ignore
-            annotation = ast_unparse(arg.annotation) or Parameter.empty
-            params.append(Parameter(arg.arg, Parameter.POSITIONAL_ONLY,
-                                    annotation=annotation))
+    if hasattr(args, 'posonlyargs'):
+        positional_args.extend((arg, Parameter.POSITIONAL_ONLY)
+                               for arg in args.posonlyargs)  # type: ignore
+    positional_args.extend((arg, Parameter.POSITIONAL_OR_KEYWORD)
+                           for arg in args.args)
 
-    for i, arg in enumerate(args.args):
-        if len(args.args) - i <= len(args.defaults):
-            default = ast_unparse(args.defaults[-len(args.args) + i])
-        else:
-            default = Parameter.empty
+    positional_defaults = [Parameter.empty] * len(positional_args)
+    if args.defaults:
+        positional_defaults[-len(args.defaults):] = [ast_unparse(default)
+                                                     for default in args.defaults]
 
+    for (arg, kind), default in zip(positional_args, positional_defaults):
         annotation = ast_unparse(arg.annotation) or Parameter.empty
-        params.append(Parameter(arg.arg, Parameter.POSITIONAL_OR_KEYWORD,
+        params.append(Parameter(arg.arg, kind,
                                 default=default, annotation=annotation))
 
     if args.vararg:
