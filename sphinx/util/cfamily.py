@@ -12,7 +12,7 @@ import re
 import warnings
 from copy import deepcopy
 from typing import (
-    Any, Callable, List, Match, Pattern, Tuple, Union
+    Any, Callable, List, Pattern, Tuple, Union
 )
 
 from docutils import nodes
@@ -69,7 +69,8 @@ char_literal_re = re.compile(r'''(?x)
 
 
 def verify_description_mode(mode: str) -> None:
-    if mode not in ('lastIsName', 'noneIsName', 'markType', 'markName', 'param'):
+    if mode not in ('lastIsName', 'noneIsName', 'markType', 'markName', 'param',
+                    'udl'):
         raise Exception("Description mode '%s' is invalid." % mode)
 
 
