@@ -520,20 +520,21 @@ def signature_from_str(signature: str) -> inspect.Signature:
     args = definition.args
     params = []
 
-    if hasattr(args, "posonlyargs"):
-        for arg in args.posonlyargs:  # type: ignore
-            annotation = ast_unparse(arg.annotation) or Parameter.empty
-            params.append(Parameter(arg.arg, Parameter.POSITIONAL_ONLY,
-                                    annotation=annotation))
+    positional = [
+        (arg, Parameter.POSITIONAL_ONLY) for arg in getattr(args, 'posonlyargs', [])
+    ]
+    positional.extend(
+        (arg, Parameter.POSITIONAL_OR_KEYWORD) for arg in args.args
+    )
 
-    for i, arg in enumerate(args.args):
-        if len(args.args) - i <= len(args.defaults):
-            default = ast_unparse(args.defaults[-len(args.args) + i])
+    for i, (arg, kind) in enumerate(positional):
+        if len(positional) - i <= len(args.defaults):
+            default = ast_unparse(args.defaults[-len(positional) + i])
         else:
             default = Parameter.empty
 
         annotation = ast_unparse(arg.annotation) or Parameter.empty
-        params.append(Parameter(arg.arg, Parameter.POSITIONAL_OR_KEYWORD,
+        params.append(Parameter(arg.arg, kind,
                                 default=default, annotation=annotation))
 
     if args.vararg:
