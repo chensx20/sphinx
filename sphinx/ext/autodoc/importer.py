@@ -309,11 +309,14 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable,
 
     if analyzer:
         # append instance attributes (cf. self.attr1) if analyzer knows
-        namespace = '.'.join(objpath)
-        for (ns, name), docstring in analyzer.attr_docs.items():
-            if namespace == ns and name not in members:
-                members[name] = ClassAttribute(subject, name, INSTANCEATTR,
-                                               '\n'.join(docstring))
+        namespaces = ['.'.join(objpath)]
+        namespaces.extend(cls.__qualname__ for cls in subject.__mro__[1:])
+
+        for namespace in namespaces:
+            for (ns, name), docstring in analyzer.attr_docs.items():
+                if namespace == ns and name not in members:
+                    members[name] = ClassAttribute(subject, name, INSTANCEATTR,
+                                                   '\n'.join(docstring))
 
     return members
 
