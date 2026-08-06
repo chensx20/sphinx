@@ -11,9 +11,13 @@
 import http.server
 import json
 import textwrap
+from types import SimpleNamespace
 
 import pytest
 import requests
+from requests.exceptions import TooManyRedirects
+
+from sphinx.testing.util import strip_escseq
 
 from .utils import CERT_FILE, http_server, https_server, modify_env
 
@@ -272,6 +276,29 @@ def test_follows_redirects_on_GET(app, capsys):
         127.0.0.1 - - [] "GET /?redirected=1 HTTP/1.1" 204 -
         """
     )
+
+
+@pytest.mark.sphinx('linkcheck', testroot='linkcheck-localserver', freshenv=True)
+def test_TooManyRedirects_on_HEAD(app, monkeypatch):
+    from sphinx.builders import linkcheck
+
+    def head(*args, **kwargs):
+        raise TooManyRedirects()
+
+    def get(*args, **kwargs):
+        return SimpleNamespace(
+            url='http://localhost:7777/',
+            history=[],
+            raise_for_status=lambda: None,
+        )
+
+    monkeypatch.setattr(linkcheck.requests, 'head', head)
+    monkeypatch.setattr(linkcheck.requests, 'get', get)
+
+    app.builder.build_all()
+
+    assert "ok        http://localhost:7777/" in strip_escseq(app._status.getvalue())
+    assert app._warning.getvalue() == ''
 
 
 class OKHandler(http.server.BaseHTTPRequestHandler):
