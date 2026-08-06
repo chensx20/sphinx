@@ -137,8 +137,11 @@ def test_info_field_list_scoped_type_xrefs(app, status, warning):
     assert "more than one target found for cross-reference 'A'" not in warnings
 
     content = (app.outdir / 'index.html').read_text()
-    assert ('<a class="reference internal" href="#module_a.A" title="module_a.A">'
-            '<em>A</em></a>' in content)
+    assert ('<dd class="field-odd"><p><strong>value</strong> '
+            '(<a class="reference internal" href="#module_a.A" title="module_a.A">'
+            '<em>A</em></a>) – description</p>' in content)
+    assert ('<dd class="field-even"><p><a class="reference internal" '
+            'href="#module_a.A" title="module_a.A">A</a></p>' in content)
 
 
 @pytest.mark.sphinx('dummy', testroot='domain-py')
