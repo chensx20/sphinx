@@ -103,6 +103,7 @@ def test_slots_attribute(app):
     ]
 
 
+@pytest.mark.skipif(sys.version_info < (3, 6), reason='py36+ is available since python3.6.')
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
 def test_inherited_instance_variable(app):
     options = {"members": None,
