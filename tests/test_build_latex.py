@@ -1608,7 +1608,8 @@ def test_latex_code_role(app):
     content = (app.outdir / 'python.tex').read_text()
 
     common_content = (
-        r'\PYG{k}{def} '
+        r'\PYG{k}{def}'
+        r'\PYG{+w}{ }'
         r'\PYG{n+nf}{foo}'
         r'\PYG{p}{(}'
         r'\PYG{l+m+mi}{1} '
@@ -1623,7 +1624,7 @@ def test_latex_code_role(app):
         r'\PYG{p}{)}'
         r'\PYG{p}{:} '
         r'\PYG{k}{pass}')
-    assert (r'Inline \sphinxcode{\sphinxupquote{' + '\n' +
-            common_content + '\n}} code block') in content
+    assert (r'Inline \sphinxcode{\sphinxupquote{%' + '\n' +
+            common_content + '\n%}} code block') in content
     assert (r'\begin{sphinxVerbatim}[commandchars=\\\{\}]' +
             '\n' + common_content + '\n' + r'\end{sphinxVerbatim}') in content
