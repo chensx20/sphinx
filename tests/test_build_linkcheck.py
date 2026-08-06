@@ -11,7 +11,9 @@
 import json
 import re
 from unittest import mock
+
 import pytest
+from requests.exceptions import HTTPError
 
 
 @pytest.mark.sphinx('linkcheck', testroot='linkcheck', freshenv=True)
@@ -105,6 +107,31 @@ def test_anchors_ignored(app, status, warning):
 
     # expect all ok when excluding #top
     assert not content
+
+
+@pytest.mark.sphinx(
+    'linkcheck', testroot='linkcheck', freshenv=True,
+    confoverrides={'linkcheck_ignore': [
+        'https://www.google.com/#!bar',
+        'https://www.google.com#!bar',
+        'http://www.sphinx-doc.org/en/1.7/intro.html#does-not-exist',
+        'https://localhost:7777/doesnotexist',
+        'https://www.google.com/image.png',
+        'https://www.google.com/image2.png',
+        'path/to/notfound',
+    ]})
+def test_raises_for_invalid_status(app, status, warning):
+    response = mock.Mock()
+    response.raise_for_status.side_effect = HTTPError(
+        '404 Client Error: Not Found for url: https://www.google.com/',
+    )
+
+    with mock.patch.multiple('requests', get=mock.Mock(return_value=response)):
+        app.builder.build_all()
+
+    content = (app.outdir / 'output.txt').read_text()
+    assert '404 Client Error: Not Found for url: https://www.google.com/' in content
+    assert "Anchor 'top' not found" not in content
 
 
 @pytest.mark.sphinx(
