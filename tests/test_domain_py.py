@@ -124,12 +124,21 @@ def test_domain_py_xrefs(app, status, warning):
 
     doctree = app.env.get_doctree('module_option')
     refnodes = list(doctree.traverse(pending_xref))
-    print(refnodes)
-    print(refnodes[0])
-    print(refnodes[1])
     assert_refnode(refnodes[0], 'test.extra', 'B', 'foo', 'meth')
     assert_refnode(refnodes[1], 'test.extra', 'B', 'foo', 'meth')
     assert len(refnodes) == 2
+
+
+@pytest.mark.sphinx('html', testroot='domain-py-xref-scope')
+def test_info_field_list_scoped_type_xrefs(app, status, warning):
+    app.builder.build_all()
+
+    warnings = warning.getvalue()
+    assert "more than one target found for cross-reference 'A'" not in warnings
+
+    content = (app.outdir / 'index.html').read_text()
+    assert ('<a class="reference internal" href="#module_a.A" title="module_a.A">'
+            '<em>A</em></a>' in content)
 
 
 @pytest.mark.sphinx('dummy', testroot='domain-py')
@@ -488,26 +497,6 @@ def test_pyobject_prefix(app):
     assert doctree[1][1][1].astext().strip() == 'say()'           # prefix is stripped
     assert doctree[1][1][3].astext().strip() == 'FooBar.say()'    # not stripped
 
-
-def test_pydata_scoped_type_xrefs(app):
-    text = (".. py:module:: module_a\n"
-            ".. py:class:: A\n"
-            "\n"
-            "   .. py:class:: A\n"
-            "\n"
-            "      .. py:function:: method(value)\n"
-            "\n"
-            "         :param value: description\n"
-            "         :type value: A\n"
-            "         :rtype: A\n")
-    doctree = restructuredtext.parse(app, text)
-    refnodes = list(doctree.traverse(pending_xref))
-
-    assert len(refnodes) == 2
-    assert_node(refnodes[0], pending_xref,
-                reftype='class', reftarget='A', **{"py:module": "module_a", "py:class": "A.A"})
-    assert_node(refnodes[1], pending_xref,
-                reftype='class', reftarget='A', **{"py:module": "module_a", "py:class": "A.A"})
 
 def test_pydata(app):
     text = (".. py:module:: example\n"

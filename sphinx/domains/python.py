@@ -1219,6 +1219,7 @@ class PythonDomain(Domain):
     def process_field_xref(self, pnode: pending_xref) -> None:
         pnode['py:module'] = self.env.ref_context.get('py:module')
         pnode['py:class'] = self.env.ref_context.get('py:class')
+        pnode['refspecific'] = True
 
     def clear_doc(self, docname: str) -> None:
         for fullname, obj in list(self.objects.items()):
