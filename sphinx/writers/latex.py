@@ -1712,7 +1712,10 @@ class LaTeXTranslator(SphinxTranslator):
         hlcode = hlcode.replace(r'\begin{Verbatim}[commandchars=\\\{\}]',
                                 r'\sphinxcode{\sphinxupquote{%')
         # get consistent trailer
-        hlcode = hlcode.rstrip()[:-14]  # strip \end{Verbatim}
+        hlcode = hlcode.rstrip()
+        trailer = r'\end{Verbatim}'
+        assert hlcode.endswith(trailer)
+        hlcode = hlcode[:-len(trailer)]
         self.body.append(hlcode)
         self.body.append('%}}')
         raise nodes.SkipNode
