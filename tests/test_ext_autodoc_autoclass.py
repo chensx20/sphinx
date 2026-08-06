@@ -103,6 +103,68 @@ def test_slots_attribute(app):
     ]
 
 
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_inherited_instance_variable(app):
+    options = {"members": None,
+               "undoc-members": True,
+               "inherited-members": True}
+    actual = do_autodoc(app, 'class', 'target.typed_vars.Derived', options)
+    assert list(actual) == [
+        '',
+        '.. py:class:: Derived()',
+        '   :module: target.typed_vars',
+        '',
+        '',
+        '   .. py:attribute:: Derived.attr1',
+        '      :module: target.typed_vars',
+        '      :type: int',
+        '      :value: 0',
+        '',
+        '',
+        '   .. py:attribute:: Derived.attr2',
+        '      :module: target.typed_vars',
+        '      :type: int',
+        '',
+        '',
+        '   .. py:attribute:: Derived.attr3',
+        '      :module: target.typed_vars',
+        '      :type: int',
+        '      :value: 0',
+        '',
+        '',
+        '   .. py:attribute:: Derived.attr4',
+        '      :module: target.typed_vars',
+        '      :type: int',
+        '',
+        '      attr4',
+        '',
+        '',
+        '   .. py:attribute:: Derived.attr5',
+        '      :module: target.typed_vars',
+        '      :type: int',
+        '',
+        '      attr5',
+        '',
+        '',
+        '   .. py:attribute:: Derived.attr6',
+        '      :module: target.typed_vars',
+        '      :type: int',
+        '',
+        '      attr6',
+        '',
+        '',
+        '   .. py:attribute:: Derived.attr7',
+        '      :module: target.typed_vars',
+        '      :type: int',
+        '',
+        '',
+        '   .. py:attribute:: Derived.descr4',
+        '      :module: target.typed_vars',
+        '      :type: int',
+        '',
+    ]
+
+
 @pytest.mark.skipif(sys.version_info < (3, 7), reason='python 3.7+ is required.')
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
 def test_show_inheritance_for_subclass_of_generic_type(app):
