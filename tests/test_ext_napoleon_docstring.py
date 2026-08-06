@@ -1363,6 +1363,31 @@ param1 : MyClass instance
 """
         self.assertEqual(expected, actual)
 
+    def test_multiple_parameters(self):
+        docstring = dedent("""\
+            Parameters
+            ----------
+            x1, x2 : array_like, optional
+                Input arrays, description of `x1`, `x2`.
+        """)
+
+        config = Config(napoleon_use_param=True)
+        actual = str(NumpyDocstring(docstring, config))
+        expected = dedent("""\
+            :param x1: Input arrays, description of `x1`, `x2`.
+            :type x1: :class:`array_like`, *optional*
+            :param x2: Input arrays, description of `x1`, `x2`.
+            :type x2: :class:`array_like`, *optional*
+        """)
+        self.assertEqual(expected, actual)
+
+        config = Config(napoleon_use_param=False)
+        actual = str(NumpyDocstring(docstring, config))
+        expected = dedent("""\
+            :Parameters: **x1, x2** (:class:`array_like`, *optional*) -- Input arrays, description of `x1`, `x2`.
+        """)
+        self.assertEqual(expected, actual)
+
     def test_see_also_refs(self):
         docstring = """\
 numpy.multivariate_normal(mean, cov, shape=None, spam=None)
