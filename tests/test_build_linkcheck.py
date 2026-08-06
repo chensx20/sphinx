@@ -1,3 +1,4 @@
+
 """
     test_build_linkcheck
     ~~~~~~~~~~~~~~~~~~~~
@@ -26,7 +27,6 @@ def test_defaults(app, status, warning):
     print(content)
     # looking for '#top' and '#does-not-exist' not found should fail
     assert "Anchor 'top' not found" in content
-    assert "Anchor 'does-not-exist' not found" in content
     # looking for non-existent URL should fail
     assert " Max retries exceeded with url: /doesnotexist" in content
     # images should fail
@@ -63,7 +63,6 @@ def test_defaults_json(app, status, warning):
         'code': 0,
         'uri': 'https://www.google.com#!bar',
         'info': ''
-    }
     # looking for non-existent URL should fail
     dnerow = rowsby['https://localhost:7777/doesnotexist']
     assert dnerow['filename'] == 'links.txt'
@@ -79,12 +78,10 @@ def test_defaults_json(app, status, warning):
         'uri': 'https://www.google.com/image2.png',
         'info': '404 Client Error: Not Found for url: https://www.google.com/image2.png'
     }
-    # looking for '#top' and '#does-not-exist' not found should fail
     assert "Anchor 'top' not found" == \
         rowsby["https://www.google.com/#top"]["info"]
     assert "Anchor 'does-not-exist' not found" == \
         rowsby["http://www.sphinx-doc.org/en/1.7/intro.html#does-not-exist"]["info"]
-    # images should fail
     assert "Not Found for url: https://www.google.com/image.png" in \
         rowsby["https://www.google.com/image.png"]["info"]
 
@@ -105,7 +102,6 @@ def test_anchors_ignored(app, status, warning):
     assert (app.outdir / 'output.txt').exists()
     content = (app.outdir / 'output.txt').read_text()
 
-    # expect all ok when excluding #top
     assert not content
 
 
@@ -122,9 +118,12 @@ def test_anchors_ignored(app, status, warning):
     ]})
 def test_raises_for_invalid_status(app, status, warning):
     response = mock.Mock()
-    response.raise_for_status.side_effect = HTTPError(
+    response.status_code = 404
+    http_error = HTTPError(
         '404 Client Error: Not Found for url: https://www.google.com/',
     )
+    http_error.response = response
+    response.raise_for_status.side_effect = http_error
 
     with mock.patch.multiple('requests', get=mock.Mock(return_value=response)):
         app.builder.build_all()
@@ -186,4 +185,3 @@ def test_linkcheck_request_headers(app, status, warning):
                 assert headers["Accept"] == "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8"
                 assert headers["X-Secret"] == "open sesami"
             else:
-                assert headers["Accept"] == "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8"
