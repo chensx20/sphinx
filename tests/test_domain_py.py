@@ -489,6 +489,26 @@ def test_pyobject_prefix(app):
     assert doctree[1][1][3].astext().strip() == 'FooBar.say()'    # not stripped
 
 
+def test_pydata_scoped_type_xrefs(app):
+    text = (".. py:module:: module_a\n"
+            ".. py:class:: A\n"
+            "\n"
+            "   .. py:class:: A\n"
+            "\n"
+            "      .. py:function:: method(value)\n"
+            "\n"
+            "         :param value: description\n"
+            "         :type value: A\n"
+            "         :rtype: A\n")
+    doctree = restructuredtext.parse(app, text)
+    refnodes = list(doctree.traverse(pending_xref))
+
+    assert len(refnodes) == 2
+    assert_node(refnodes[0], pending_xref,
+                reftype='class', reftarget='A', **{"py:module": "module_a", "py:class": "A.A"})
+    assert_node(refnodes[1], pending_xref,
+                reftype='class', reftarget='A', **{"py:module": "module_a", "py:class": "A.A"})
+
 def test_pydata(app):
     text = (".. py:module:: example\n"
             ".. py:data:: var\n"

@@ -1216,6 +1216,10 @@ class PythonDomain(Domain):
         self.modules[name] = ModuleEntry(self.env.docname, node_id,
                                          synopsis, platform, deprecated)
 
+    def process_field_xref(self, pnode: pending_xref) -> None:
+        pnode['py:module'] = self.env.ref_context.get('py:module')
+        pnode['py:class'] = self.env.ref_context.get('py:class')
+
     def clear_doc(self, docname: str) -> None:
         for fullname, obj in list(self.objects.items()):
             if obj.docname == docname:
