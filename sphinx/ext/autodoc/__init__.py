@@ -196,8 +196,6 @@ def setup(app: Sphinx) -> ExtensionMetadata:
         'autodoc_use_legacy_class_based', False, 'env', types=frozenset({bool})
     )
 
-<<<<<<< HEAD
-=======
 
 logger = logging.getLogger(__name__)
 
@@ -2875,7 +2873,6 @@ def setup(app: Sphinx) -> Dict[str, Any]:
     app.add_config_value('autodoc_type_aliases', {}, True)
     app.add_config_value('autodoc_warningiserror', True, True)
     app.add_config_value('autodoc_inherit_docstrings', True, True)
->>>>>>> 712f29eed (fix(autodoc): preserve explicit alias docs)
     app.add_event('autodoc-before-process-signature')
     app.add_event('autodoc-process-docstring')
     app.add_event('autodoc-process-signature')
