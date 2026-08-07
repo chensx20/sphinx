@@ -70,3 +70,12 @@ def buffer_len(data: buffer_like) -> int:
 
     Tests Union type alias cross-reference resolution.
     """
+
+
+TypeAliasTypeExplicitMultiline = TypeAliasType('TypeAliasTypeExplicitMultiline', Foo)  # NoQA: UP040
+"""This is an explicitly constructed typing.TypeAlias.
+
+This alias keeps its explicit multiline doc comment.
+"""
+
+TypeAliasTypeNoDoc = TypeAliasType('TypeAliasTypeNoDoc', Foo)  # NoQA: UP040
