@@ -2547,11 +2547,12 @@ def test_canonical(app):
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
 def test_autodoc_type_alias_explicit_docstring(app):
-    actual = do_autodoc(app, 'data', 'target.pep695.TypeAliasTypeExplicitMultiline')
+    actual = do_autodoc(app, 'data', 'target.pep695.TypeAliasExplicit')
     assert list(actual) == [
         '',
-        '.. py:data:: TypeAliasTypeExplicitMultiline',
+        '.. py:data:: TypeAliasExplicit',
         '   :module: target.pep695',
+        '   :value: target.pep695.Foo',
         '',
         '   This is an explicitly constructed typing.TypeAlias.',
         '',
@@ -2562,12 +2563,14 @@ def test_autodoc_type_alias_explicit_docstring(app):
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
 def test_autodoc_type_alias_generated_alias_text(app):
-    actual = do_autodoc(app, 'data', 'target.autodoc_type_aliases.myint')
+    actual = do_autodoc(app, 'data', 'target.genericalias.T')
     assert list(actual) == [
         '',
-        '.. py:data:: myint',
-        '   :module: target.autodoc_type_aliases',
+        '.. py:data:: T',
+        '   :module: target.genericalias',
         '',
-        "   alias of :class:`int`",
+        '   A list of int',
+        '',
+        r'   alias of :class:`~typing.List`\ [:class:`int`]',
         '',
     ]
