@@ -2571,6 +2571,6 @@ def test_autodoc_type_alias_generated_alias_text(app):
         '',
         '   A list of int',
         '',
-        r'   alias of :class:`~typing.List`\ [:class:`int`]',
+        '   alias of :class:`~typing.List`\ [:class:`int`]',
         '',
     ]
