@@ -319,7 +319,7 @@ def test_signature_from_str_basic():
 def test_signature_from_str_default_values():
     signature = ('(a=0, b=0.0, c="str", d=b"bytes", e=..., f=True, '
                  'g=[1, 2, 3], h={"a": 1}, i={1, 2, 3}, '
-                 'j=lambda x, y: None, k=None, l=object(), m=foo.bar.CONSTANT)')
+                 'j=lambda x, y: None, k=None, l=object(), m=foo.bar.CONSTANT, n=(1,))')
     sig = inspect.signature_from_str(signature)
     assert sig.parameters['a'].default == '0'
     assert sig.parameters['b'].default == '0.0'
@@ -334,6 +334,7 @@ def test_signature_from_str_default_values():
     assert sig.parameters['k'].default == 'None'
     assert sig.parameters['l'].default == 'object()'
     assert sig.parameters['m'].default == 'foo.bar.CONSTANT'
+    assert sig.parameters['n'].default == '(1,)'
 
 
 def test_signature_from_str_annotations():
