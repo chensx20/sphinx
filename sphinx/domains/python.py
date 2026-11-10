@@ -1187,6 +1187,10 @@ class PythonDomain(Domain):
         PythonModuleIndex,
     ]
 
+    def process_field_xref(self, pnode: pending_xref) -> None:
+        pnode['py:module'] = self.env.ref_context.get('py:module')
+        pnode['py:class'] = self.env.ref_context.get('py:class')
+
     @property
     def objects(self) -> Dict[str, ObjectEntry]:
         return self.data.setdefault('objects', {})  # fullname -> ObjectEntry
