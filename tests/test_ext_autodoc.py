@@ -45,6 +45,61 @@ def do_autodoc(app, objtype, name, options=None):
     return bridge.result
 
 
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_autodoc_class_properties(app):
+    from target import properties
+
+    properties.getter_calls.clear()
+    for classname in ('ClassProperties', 'SubclassProperties', 'MetaProperties'):
+        actual = list(do_autodoc(app, 'class', 'target.properties.' + classname,
+                                 {'members': None}))
+        for name in ('concrete', 'abstract'):
+            assert '   .. py:property:: %s.%s' % (classname, name) in actual
+        assert actual.count('      :classmethod:') == 2
+        assert actual.count('      :abstractmethod:') == 1
+
+    actual = list(do_autodoc(app, 'class', 'target.properties.InheritedProperties',
+                             {'members': None}))
+    assert not any('.. py:property::' in line for line in actual)
+    actual = list(do_autodoc(app, 'class', 'target.properties.InheritedProperties',
+                             {'members': None, 'inherited-members': None}))
+    assert actual.count('      :classmethod:') == 2
+    actual = list(do_autodoc(app, 'class', 'target.properties.InheritedProperties',
+                             {'members': None, 'inherited-members': 'ClassProperties'}))
+    assert not any('.. py:property::' in line for line in actual)
+
+    actual = list(do_autodoc(app, 'class', 'target.properties.ReplacedProperties',
+                             {'members': None}))
+    assert '   .. py:method:: ReplacedProperties.concrete()' in actual
+    assert '   .. py:property:: ReplacedProperties.abstract' in actual
+    assert '      :classmethod:' not in actual
+    actual = list(do_autodoc(app, 'class', 'target.properties.WithMetaProperties',
+                             {'members': None, 'inherited-members': None}))
+    assert not any('.. py:property::' in line for line in actual)
+    assert properties.getter_calls == []
+    assert app._warning.getvalue() == ''
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_class_property_attrgetter_hook(app):
+    from target import properties
+
+    calls = []
+
+    def attrgetter(obj, name, *defaults):
+        calls.append(name)
+        if name == 'concrete':
+            return property(doc='Custom attribute getter documentation.')
+        return getattr(obj, name, *defaults)
+
+    app.add_autodoc_attrgetter(type, attrgetter)
+    actual = list(do_autodoc(app, 'property', 'target.properties.ClassProperties.concrete'))
+    assert 'concrete' in calls
+    assert '   Custom attribute getter documentation.' in actual
+    assert '   :classmethod:' not in actual
+    assert properties.getter_calls == []
+
+
 def make_directive_bridge(env):
     options = Options(
         inherited_members = False,

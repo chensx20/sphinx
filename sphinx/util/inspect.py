@@ -385,6 +385,9 @@ def iscoroutinefunction(obj: Any) -> bool:
 
 def isproperty(obj: Any) -> bool:
     """Check if the object is property."""
+    if isinstance(obj, classmethod):
+        return isinstance(obj.__func__, property)
+
     if sys.version_info >= (3, 8):
         from functools import cached_property  # cached_property is available since py3.8
         if isinstance(obj, cached_property):
@@ -408,9 +411,26 @@ def isgenericalias(obj: Any) -> bool:
         return False
 
 
+def _get_class_attribute(cls: Type, name: str, default: Any = None) -> Any:
+    """Look up a class member without invoking metaclass attribute access."""
+    for base in type.__dict__['__mro__'].__get__(cls):
+        namespace = type.__dict__['__dict__'].__get__(base)
+        if name in namespace:
+            return namespace[name]
+    return default
+
+
 def safe_getattr(obj: Any, name: str, *defargs: Any) -> Any:
     """A getattr() that turns all exceptions into AttributeErrors."""
     try:
+        if isinstance(obj, type):
+            # Only the immediate metaclass's MRO participates in class lookup.
+            meta_descriptor = _get_class_attribute(type(obj), name)
+            if not inspect.isdatadescriptor(meta_descriptor):
+                descriptor = _get_class_attribute(obj, name, meta_descriptor)
+                if isinstance(descriptor, classmethod) and isproperty(descriptor):
+                    return descriptor
+
         return getattr(obj, name, *defargs)
     except Exception as exc:
         # sometimes accessing a property raises an exception (e.g.
@@ -837,6 +857,8 @@ def getdoc(obj: Any, attrgetter: Callable = safe_getattr,
     * inherited docstring
     * inherited decorated methods
     """
+    if isinstance(obj, classmethod) and isproperty(obj):
+        obj = obj.__func__
     doc = attrgetter(obj, '__doc__', None)
     if ispartial(obj) and doc == obj.__class__.__doc__:
         return getdoc(obj.func)
@@ -846,7 +868,7 @@ def getdoc(obj: Any, attrgetter: Callable = safe_getattr,
             for basecls in getmro(cls):
                 meth = safe_getattr(basecls, name, None)
                 if meth is not None:
-                    doc = attrgetter(meth, '__doc__', None)
+                    doc = getdoc(meth, attrgetter)
                     if doc is not None:
                         break
 

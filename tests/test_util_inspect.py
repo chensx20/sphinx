@@ -426,6 +426,149 @@ def test_safe_getattr_with_default():
     assert result == 'baz'
 
 
+def test_safe_getattr_class_properties():
+    calls = []
+
+    class Meta(type):
+        @classmethod
+        @property
+        def meta(cls):
+            """Metaclass descriptor documentation."""
+            calls.append('meta')
+            raise RuntimeError
+
+    class Base(metaclass=Meta):
+        @classmethod
+        @property
+        def prop(cls):
+            """Descriptor documentation."""
+            calls.append('prop')
+            return 42
+
+        @classmethod
+        def method(cls):
+            return cls
+
+    class Child(Base):
+        pass
+
+    class Undocumented(Base):
+        @classmethod
+        @property
+        def prop(cls):
+            calls.append('undocumented')
+            raise RuntimeError
+
+    class Replacement(Base):
+        prop = 'replacement'
+        meta = 'shadowed'
+
+    for cls in (Base, Child):
+        prop = inspect.safe_getattr(cls, 'prop')
+        assert prop is Base.__dict__['prop']
+        assert inspect.isproperty(prop)
+        assert inspect.getdoc(prop) == 'Descriptor documentation.'
+        meta = inspect.safe_getattr(cls, 'meta')
+        assert meta is Meta.__dict__['meta']
+        assert inspect.getdoc(meta) == 'Metaclass descriptor documentation.'
+        assert inspect.safe_getattr(cls, 'method')() is cls
+        assert not inspect.isproperty(cls.__dict__.get('method'))
+        assert inspect.safe_getattr(cls, 'missing', 42) == 42
+        with pytest.raises(AttributeError):
+            inspect.safe_getattr(cls, 'missing')
+    assert inspect.safe_getattr(Replacement, 'prop') == 'replacement'
+    assert inspect.safe_getattr(Replacement, 'meta') == 'shadowed'
+    assert not inspect.isproperty(Base.__dict__['method'])
+    assert inspect.getdoc(inspect.safe_getattr(Undocumented, 'prop'),
+                          allow_inherited=True, cls=Undocumented,
+                          name='prop') == 'Descriptor documentation.'
+    assert calls == []
+
+
+def test_safe_getattr_class_property_shadowed_by_metaclass():
+    calls = []
+
+    class Meta(type):
+        @property
+        def prop(cls):
+            calls.append('metaclass data descriptor')
+            return 'metaclass'
+
+    class Base(metaclass=Meta):
+        @classmethod
+        @property
+        def prop(cls):
+            calls.append('class property')
+            raise RuntimeError
+
+    assert inspect.safe_getattr(Base, 'prop') == 'metaclass'
+    assert calls == ['metaclass data descriptor']
+
+
+@pytest.mark.parametrize('raises', [False, True])
+def test_safe_getattr_class_property_with_metaclass_of_metaclass(raises):
+    calls = []
+
+    class DataDescriptor:
+        def __get__(self, instance, owner):
+            calls.append('metaclass of metaclass')
+            return 'unrelated descriptor'
+
+        def __set__(self, instance, value):
+            raise AssertionError('descriptor must not be assigned')
+
+    class MetaMeta(type):
+        value = DataDescriptor()
+
+    class Meta(type, metaclass=MetaMeta):
+        pass
+
+    class Base(metaclass=Meta):
+        @classmethod
+        @property
+        def value(cls):
+            calls.append('class property')
+            if raises:
+                raise RuntimeError('getter must not run')
+            return 42
+
+    class Child(Base):
+        pass
+
+    descriptor = Base.__dict__['value']
+    for cls in (Base, Child):
+        assert inspect.safe_getattr(cls, 'value') is descriptor
+        assert calls == []
+
+
+@pytest.mark.parametrize('raises', [False, True])
+def test_safe_getattr_class_property_with_metaclass_dict_override(raises):
+    calls = []
+
+    class Meta(type):
+        @property
+        def __dict__(cls):
+            calls.append('metaclass dictionary')
+            return type.__dict__['__dict__'].__get__(cls)
+
+    class Base(metaclass=Meta):
+        @classmethod
+        @property
+        def value(cls):
+            calls.append('class property')
+            if raises:
+                raise RuntimeError('getter must not run')
+            return 42
+
+    class Child(Base):
+        pass
+
+    descriptor = type.__dict__['__dict__'].__get__(Base)['value']
+    for cls in (Base, Child):
+        assert inspect.safe_getattr(cls, 'value') is descriptor
+        assert calls == []
+
+
 def test_safe_getattr_with_exception():
     class Foo:
         def __getattr__(self, item):
