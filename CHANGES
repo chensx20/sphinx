@@ -47,6 +47,7 @@ Features added
 Bugs fixed
 ----------
 
+* #9230: Spaced inline parameter types are split incorrectly into type and name
 * #8872: autodoc: stacked singledispatches are wrongly rendered
 * #8597: autodoc: a docsting having metadata only should be treated as
   undocumented
