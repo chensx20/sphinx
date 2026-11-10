@@ -14,6 +14,33 @@ import pytest
 from .test_ext_autodoc import do_autodoc
 
 
+@pytest.mark.parametrize(('typehints', 'signature'), [
+    ('signature', 'enum_func(e: target.enums.EnumCls = EnumCls.val1) -> None'),
+    ('none', 'enum_func(e=EnumCls.val1)'),
+])
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_enum_default(app, typehints, signature):
+    app.config.autodoc_typehints = typehints
+    actual = do_autodoc(app, 'function', 'target.enums.enum_func')
+    assert list(actual) == [
+        '',
+        '.. py:function:: ' + signature,
+        '   :module: target.enums',
+        '',
+    ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_enum_defaults(app):
+    actual = do_autodoc(app, 'function', 'target.enums.enum_defaults')
+    assert list(actual) == [
+        '',
+        '.. py:function:: enum_defaults(e=EnumCls.val3, *, keyword=EnumCls.val2)',
+        '   :module: target.enums',
+        '',
+    ]
+
+
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
 def test_classes(app):
     actual = do_autodoc(app, 'function', 'target.classes.Foo')

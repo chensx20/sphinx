@@ -10,6 +10,7 @@
 
 import ast
 import datetime
+import enum
 import functools
 import sys
 import types
@@ -470,6 +471,117 @@ def test_safe_getattr_with___dict___override():
         assert exc.args[0] == 'bar'
     else:
         pytest.fail('AttributeError not raised')
+
+
+class EnumDefault(enum.Enum):
+    value = 10
+    alias = 10
+
+
+class IntEnumDefault(enum.IntEnum):
+    value = 10
+
+
+class StringEnumDefault(str, enum.Enum):
+    value = 'value'
+
+
+class CustomEnumDefault(enum.Enum):
+    value = 10
+
+    def __repr__(self):
+        raise RuntimeError('do not use repr')
+
+    def __str__(self):
+        raise RuntimeError('do not use str')
+
+
+class FlagDefault(enum.Flag):
+    first = 1
+    second = 2
+    both = 3
+    third = 4
+
+
+class IntFlagDefault(enum.IntFlag):
+    first = 1
+    second = 2
+    both = 3
+    third = 4
+
+
+@pytest.mark.parametrize(('value', 'expected'), [
+    (EnumDefault.value, 'EnumDefault.value'),
+    (EnumDefault.alias, 'EnumDefault.value'),
+    (IntEnumDefault.value, 'IntEnumDefault.value'),
+    (StringEnumDefault.value, 'StringEnumDefault.value'),
+    pytest.param(CustomEnumDefault.value, 'CustomEnumDefault.value', id='custom-repr-str'),
+    (FlagDefault.both, 'FlagDefault.both'),
+    (IntFlagDefault.both, 'IntFlagDefault.both'),
+])
+def test_object_description_enum(value, expected):
+    assert inspect.object_description(value) == expected
+
+
+@pytest.mark.parametrize('value', [
+    FlagDefault(0), FlagDefault.first | FlagDefault.third,
+    IntFlagDefault(0), IntFlagDefault.first | IntFlagDefault.third, IntFlagDefault(8),
+])
+def test_object_description_unnamed_enum(value):
+    assert inspect.object_description(value) == repr(value)
+
+
+def test_signature_enum_defaults():
+    def func(plain=EnumDefault.alias, annotated: EnumDefault = EnumDefault.value,
+             *, keyword=EnumDefault.value) -> None:
+        pass
+
+    assert stringify_signature(inspect.signature(func)) == (
+        '(plain=EnumDefault.value, annotated: tests.test_util_inspect.EnumDefault = '
+        'EnumDefault.value, *, keyword=EnumDefault.value) -> None'
+    )
+
+
+def test_signature_enum_methods():
+    class Foo:
+        def __init__(self, value=EnumDefault.value):
+            pass
+
+        def method(self, value=EnumDefault.value):
+            pass
+
+    assert stringify_signature(inspect.signature(Foo)) == '(value=EnumDefault.value)'
+    assert stringify_signature(inspect.signature(Foo().method)) == '(value=EnumDefault.value)'
+
+
+def test_object_description_enum_containers():
+    assert inspect.object_description({'value': EnumDefault.value}) == (
+        "{'value': EnumDefault.value}"
+    )
+    assert inspect.object_description({EnumDefault.value}) == '{EnumDefault.value}'
+    assert inspect.object_description(frozenset([EnumDefault.value])) == (
+        'frozenset({EnumDefault.value})'
+    )
+    assert inspect.object_description([EnumDefault.value]) == repr([EnumDefault.value])
+    assert inspect.object_description((EnumDefault.value,)) == repr((EnumDefault.value,))
+
+
+def test_object_description_repr_error():
+    class BrokenRepr:
+        def __repr__(self):
+            raise RuntimeError
+
+    with pytest.raises(ValueError) as exc:
+        inspect.object_description(BrokenRepr())
+    assert isinstance(exc.value.__cause__, RuntimeError)
+
+
+def test_object_description_normalization():
+    class MultilineRepr:
+        def __repr__(self):
+            return '<object at 0x12345678>\nnext line'
+
+    assert inspect.object_description(MultilineRepr()) == '<object> next line'
 
 
 def test_dictionary_sorting():

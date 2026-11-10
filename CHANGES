@@ -50,6 +50,7 @@ Features added
 Bugs fixed
 ----------
 
+* #9281: autodoc: Render Enum defaults using their class and member names
 * #8872: autodoc: stacked singledispatches are wrongly rendered
 * #8597: autodoc: a docsting having metadata only should be treated as
   undocumented
