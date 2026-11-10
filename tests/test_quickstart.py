@@ -10,6 +10,7 @@
 
 import time
 from io import StringIO
+from unittest.mock import Mock
 
 import pytest
 
@@ -90,6 +91,135 @@ def test_do_prompt_with_nonascii():
     qs.term_input = mock_input(answers)
     result = qs.do_prompt('Q1', default='\u65e5\u672c')
     assert result == '\u30c9\u30a4\u30c4'
+
+
+def test_is_path_empty():
+    assert qs.is_path('') == ''
+
+
+def test_is_path_directory(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert qs.is_path('.') == '.'
+    assert qs.is_path(str(tmp_path)) == str(tmp_path)
+
+
+def test_is_path_expands_home(tmp_path, monkeypatch):
+    monkeypatch.setenv('HOME', str(tmp_path))
+    monkeypatch.setenv('USERPROFILE', str(tmp_path))
+    (tmp_path / 'docs').mkdir()
+    assert qs.is_path('~/docs') == str(tmp_path / 'docs')
+    with pytest.raises(qs.ValidationError, match='^Please enter a valid path name[.]$'):
+        qs.is_path('~/missing')
+    assert not (tmp_path / 'missing').exists()
+
+
+@pytest.mark.parametrize('default', ['', '.'])
+@pytest.mark.parametrize('answer', ['', ' \t '])
+def test_do_prompt_path_default(tmp_path, monkeypatch, capsys, default, answer):
+    monkeypatch.chdir(tmp_path)
+    input_ = Mock(side_effect=[answer])
+    monkeypatch.setattr(qs, 'term_input', input_)
+
+    assert qs.do_prompt('Root path', default, qs.is_path) == default
+    assert input_.call_count == 1
+    assert capsys.readouterr().out == ''
+
+
+@pytest.mark.parametrize('cancel', [False, True])
+def test_do_prompt_path_retry(tmp_path, monkeypatch, capsys, cancel):
+    missing = tmp_path / 'missing'
+    regular_file = tmp_path / 'file'
+    regular_file.write_bytes(b'not a directory')
+    for invalid in [missing, regular_file]:
+        with pytest.raises(qs.ValidationError, match='^Please enter a valid path name[.]$'):
+            qs.is_path(str(invalid))
+
+    final_answer = '' if cancel else str(tmp_path)
+    input_ = Mock(side_effect=[str(missing), str(regular_file), final_answer])
+    monkeypatch.setattr(qs, 'term_input', input_)
+
+    assert qs.do_prompt('Root path', '', qs.is_path) == final_answer
+    assert input_.call_count == 3
+    assert len({call[0][0] for call in input_.call_args_list}) == 1
+    assert capsys.readouterr().out == '* Please enter a valid path name.\n' * 2
+    assert not missing.exists()
+    assert regular_file.read_bytes() == b'not a directory'
+
+
+def snapshot_tree(root):
+    return {str(filename.relative_to(root)): filename.read_bytes() if filename.is_file() else None
+            for filename in root.rglob('*')}
+
+
+@pytest.mark.parametrize('config_path', ['conf.py', 'source/conf.py'])
+@pytest.mark.parametrize('supplied_root', [False, True])
+@pytest.mark.parametrize('response', ['enter', 'whitespace', 'invalid', 'collision'])
+def test_quickstart_existing_conf_cancel(tmp_path, monkeypatch, capsys,
+                                         config_path, supplied_root, response):
+    config = tmp_path / config_path
+    config.parent.mkdir(exist_ok=True)
+    config.write_bytes(b'# existing project\n')
+    (tmp_path / 'index.rst').write_bytes(b'Existing documentation\n')
+    answers = ['']
+    if response == 'whitespace':
+        answers = [' \t ']
+    elif response == 'invalid':
+        answers = [str(tmp_path / 'missing'), str(config), '']
+    elif response == 'collision':
+        other = tmp_path / 'other' / config_path
+        other.parent.mkdir(parents=True)
+        other.write_bytes(b'# another project\n')
+        answers = [str(tmp_path / 'other'), '']
+    expected = snapshot_tree(tmp_path)
+    if not supplied_root:
+        monkeypatch.chdir(tmp_path)
+    input_ = Mock(side_effect=answers)
+    monkeypatch.setattr(qs, 'term_input', input_)
+
+    with pytest.raises(SystemExit) as exc:
+        qs.main([str(tmp_path)] if supplied_root else [])
+
+    assert exc.value.code == 1
+    assert input_.call_count == len(answers)
+    prompts = [call[0][0] for call in input_.call_args_list]
+    assert all(prompt.startswith(qs.PROMPT_PREFIX + 'Please enter a new root path')
+               for prompt in prompts)
+    output = capsys.readouterr()
+    assert output.out.count('Please enter a valid path name.') == (2 if response == 'invalid' else 0)
+    assert output.out.count('an existing conf.py has been found') == (2 if response == 'collision' else 1)
+    assert '[Interrupted.]' not in output.out
+    assert output.err == ''
+    assert snapshot_tree(tmp_path) == expected
+
+
+@pytest.mark.parametrize('config_path', ['conf.py', 'source/conf.py'])
+@pytest.mark.parametrize('invalid_first', [False, True])
+def test_quickstart_valid_replacement(tmp_path, monkeypatch, capsys, config_path, invalid_first):
+    original = tmp_path / 'original'
+    config = original / config_path
+    config.parent.mkdir(parents=True)
+    config.write_bytes(b'# existing project\n')
+    expected = snapshot_tree(original)
+    replacement = tmp_path / 'replacement'
+    replacement.mkdir()
+    answers = [str(replacement), '', '']
+    if invalid_first:
+        answers[:0] = [str(tmp_path / 'missing'), str(config)]
+    input_ = Mock(side_effect=answers)
+    monkeypatch.setattr(qs, 'term_input', input_)
+
+    assert qs.main(['-p', 'Test', '-a', 'Author', '-l', 'en', str(original)]) == 0
+
+    assert input_.call_count == len(answers)
+    output = capsys.readouterr()
+    assert output.out.count('Please enter a valid path name.') == (2 if invalid_first else 0)
+    assert output.err == ''
+    assert snapshot_tree(original) == expected
+    assert not (tmp_path / 'missing').exists()
+    for filename in ['conf.py', 'index.rst', 'Makefile', 'make.bat']:
+        assert (replacement / filename).is_file()
+    for dirname in ['_static', '_templates']:
+        assert (replacement / dirname).is_dir()
 
 
 def test_quickstart_defaults(tempdir):
