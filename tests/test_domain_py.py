@@ -113,12 +113,12 @@ def test_domain_py_xrefs(app, status, warning):
                    'ModTopLevel', 'class')
     assert_refnode(refnodes[8], 'module_b.submodule', 'ModTopLevel',
                    'ModNoModule', 'class')
-    assert_refnode(refnodes[9], False, False, 'int', 'class')
-    assert_refnode(refnodes[10], False, False, 'tuple', 'class')
-    assert_refnode(refnodes[11], False, False, 'str', 'class')
-    assert_refnode(refnodes[12], False, False, 'float', 'class')
-    assert_refnode(refnodes[13], False, False, 'list', 'class')
-    assert_refnode(refnodes[14], False, False, 'ModTopLevel', 'class')
+    assert_refnode(refnodes[9], 'module_b.submodule', None, 'int', 'class')
+    assert_refnode(refnodes[10], 'module_b.submodule', None, 'tuple', 'class')
+    assert_refnode(refnodes[11], 'module_b.submodule', None, 'str', 'class')
+    assert_refnode(refnodes[12], 'module_b.submodule', None, 'float', 'class')
+    assert_refnode(refnodes[13], 'module_b.submodule', None, 'list', 'class')
+    assert_refnode(refnodes[14], 'module_b.submodule', None, 'ModTopLevel', 'class')
     assert_refnode(refnodes[15], False, False, 'index', 'doc', domain='std')
     assert len(refnodes) == 16
 
@@ -204,6 +204,121 @@ def test_domain_py_find_obj(app, status, warning):
     assert (find_obj(None, 'NestedParentA.NestedChildA', 'subchild_1', 'meth') ==
             [('NestedParentA.NestedChildA.subchild_1',
               ('roles', 'NestedParentA.NestedChildA.subchild_1', 'method'))])
+
+
+@pytest.mark.sphinx('html', testroot='domain-py-field-xrefs', freshenv=True)
+def test_domain_py_field_xrefs(app, warning):
+    app.builder.build_all()
+    expected = {
+        'mod.separate': ('mod', None, [('A', 'mod.A'), ('A', 'mod.A')]),
+        'mod.inline': ('mod', None, [('A', 'mod.A'), ('mod.submod.A', 'mod.submod.A')]),
+        'mod.submod.overridden': ('mod.submod', None,
+                                  [('A', 'mod.submod.A'), ('A', 'mod.submod.A')]),
+        'mod.restored': ('mod', None, [('A', 'mod.A')]),
+        'mod.precedence': ('mod', None, [('A', 'mod.A'), ('A', 'A')]),
+        'mod.marked': ('mod', None, [('A', 'mod.A')]),
+        'mod.compound': ('mod', None,
+                         [('list', None), ('A', 'mod.A'),
+                          ('mod.submod.A', 'mod.submod.A'), ('mod.A', 'mod.A')]),
+        'mod.Outer.Inner.nested': ('mod', 'Outer.Inner',
+                                   [('A', 'mod.Outer.Inner.A'), ('A', 'mod.Outer.Inner.A')]),
+        'mod.Outer.restored': ('mod', 'Outer', [('A', 'mod.Outer.A')]),
+        'mod.Outer.value': ('mod', 'Outer', [('A', 'mod.Outer.A')]),
+        'mod.outside': ('mod', None, [('A', 'mod.A')]),
+        'mod.submod.separate': ('mod.submod', None,
+                                [('A', 'mod.submod.A'), ('A', 'mod.submod.A')]),
+        'mod.submod.inline': ('mod.submod', None, [('A', 'mod.submod.A'), ('mod.A', 'mod.A')]),
+        'mod.submod.value': ('mod.submod', None, [('A', 'mod.submod.A')]),
+    }
+    doctree = app.env.get_doctree('index')
+    resolved = app.env.get_and_resolve_doctree('index', app.builder)
+    for tree, node_type in [(doctree, pending_xref), (resolved, nodes.reference)]:
+        actual = {}
+        for description in tree.traverse(desc):
+            name = description[0]['ids'][0]
+            if name not in expected:
+                continue
+            module, classname, targets = expected[name]
+            field_list = next(child for child in description[1]
+                              if isinstance(child, nodes.field_list))
+            references = list(field_list.traverse(node_type))
+            if node_type is pending_xref:
+                assert [reference['reftarget'] for reference in references] == [
+                    target for target, destination in targets]
+                for reference in references:
+                    assert reference['py:module'] == module
+                    assert reference['py:class'] == classname
+                    assert reference['reftype'] == 'class'
+                if name == 'mod.precedence':
+                    assert references[0]['refspecific'] is True
+                    assert 'refspecific' not in references[1]
+                else:
+                    assert all(reference['refspecific'] for reference in references)
+            else:
+                assert [reference['refid'] for reference in references] == [
+                    destination for target, destination in targets if destination]
+            actual[name] = field_list.astext()
+        assert set(actual) == set(expected)
+        assert 'list[A] or (mod.submod.A, A)' in actual['mod.compound']
+        assert 'local' in actual['mod.marked']
+    assert warning.getvalue() == ''
+
+
+@pytest.mark.parametrize('field, target, caption, role, destination, ambiguous', [
+    (':rtype: A', 'A', 'A', 'class', 'mod.A', True),
+    (':rtype: Unique', 'Unique', 'Unique', 'class', 'mod.Unique', False),
+    (':rtype: Missing', 'Missing', 'Missing', 'class', None, False),
+    (':rtype: mod.A', 'mod.A', 'mod.A', 'class', 'mod.A', False),
+    (':rtype: ~mod.A', 'mod.A', 'A', 'class', 'mod.A', False),
+    (':rtype: .mod.A', 'mod.A', 'mod.A', 'class', 'mod.A', False),
+    (':rtype: None', 'None', 'None', 'obj', None, False),
+    (':raises A: Failed.', 'A', 'A', 'exc', 'mod.A', True),
+    (':vartype: Unique', 'Unique', 'Unique', 'class', 'mod.Unique', False),
+    (':rtype: :py:class:`caption <mod.A>`', 'mod.A', 'caption', 'class', 'mod.A', False),
+])
+def test_domain_py_field_xref_controls(
+        app, warning, field, target, caption, role, destination, ambiguous):
+    text = ('.. py:class:: mod.A\n\n'
+            '.. py:class:: mod.submod.A\n\n'
+            '.. py:class:: mod.Unique\n\n'
+            '.. py:function:: other.Unique()\n\n'
+            '.. py:function:: function()\n\n'
+            '   %s\n' % field)
+    doctree = restructuredtext.parse(app, text)
+    references = list(doctree.traverse(pending_xref))
+    assert len(references) == 1
+    reference = references[0]
+    assert_node(reference, pending_xref, reftarget=target, reftype=role,
+                **{'py:module': None, 'py:class': None})
+    assert reference.astext() == caption
+    app.env.resolve_references(doctree, 'index', app.builder)
+    links = list(doctree.traverse(nodes.reference))
+    assert [link['refid'] for link in links] == ([destination] if destination else [])
+    assert ('more than one target found' in warning.getvalue()) is ambiguous
+    if not ambiguous:
+        assert warning.getvalue() == ''
+
+
+@pytest.mark.sphinx(freshenv=True)
+def test_domain_py_field_xref_variable(app, warning):
+    text = ('.. py:module:: mod\n\n'
+            '.. py:class:: A\n\n'
+            '.. py:attribute:: value\n\n'
+            '.. py:function:: function()\n\n'
+            '   :var value: A value.\n'
+            '   :vartype value: A\n'
+            '   :returns: A\n')
+    doctree = restructuredtext.parse(app, text)
+    references = list(doctree.traverse(pending_xref))
+    assert len(references) == 2
+    for reference, target, role in zip(references, ['value', 'A'], ['obj', 'class']):
+        assert_node(reference, pending_xref, reftarget=target, reftype=role,
+                    **{'py:module': 'mod', 'py:class': None})
+    app.env.resolve_references(doctree, 'index', app.builder)
+    assert [link['refid'] for link in doctree.traverse(nodes.reference)] == ['mod.value', 'mod.A']
+    fields = list(doctree.traverse(nodes.field))
+    assert fields[-1].astext() == 'Returns\n\nA'
+    assert warning.getvalue() == ''
 
 
 def test_get_full_qualified_name():
