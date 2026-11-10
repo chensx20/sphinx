@@ -213,7 +213,9 @@ class _UnparseVisitor(ast.NodeVisitor):
         return "%s %s" % (self.visit(node.op), self.visit(node.operand))
 
     def visit_Tuple(self, node: ast.Tuple) -> str:
-        if node.elts:
+        if len(node.elts) == 1:
+            return "(" + self.visit(node.elts[0]) + ",)"
+        elif node.elts:
             return "(" + ", ".join(self.visit(e) for e in node.elts) + ")"
         else:
             return "()"
