@@ -136,9 +136,23 @@ inserting them into the page source under a suitable :rst:dir:`py:module`,
            :undoc-members:
 
    * "Private" members (that is, those named like ``_private`` or ``__private``)
-     will be included if the ``private-members`` flag option is given.
+     will be included if the ``private-members`` option is given.  Without an
+     argument, this includes all eligible private members.  To include only
+     selected private members, give a comma-separated list of names::
+
+        .. autoclass:: my.Class
+           :members:
+           :private-members: _private, __private
+
+     This option does not enable member enumeration by itself; use it with
+     ``members``.  Public members are still included.  Selected private members
+     must have documentation unless ``undoc-members`` is also given, and special
+     members still require ``special-members``.
 
      .. versionadded:: 1.1
+
+     .. versionchanged:: 3.2
+        The option can now take a comma-separated list of private member names.
 
    * autodoc considers a member private if its docstring contains
      ``:meta private:`` in its :ref:`info-field-lists`.
@@ -428,6 +442,7 @@ There are also config values that you can set:
            'members': 'var1, var2',
            'member-order': 'bysource',
            'special-members': '__init__',
+           'private-members': '_private, __private',
            'undoc-members': True,
            'exclude-members': '__weakref__'
        }
@@ -447,6 +462,9 @@ There are also config values that you can set:
 
    .. versionchanged:: 2.1
       Added ``'imported-members'``.
+
+   .. versionchanged:: 3.2
+      ``'private-members'`` accepts a comma-separated string of member names.
 
 .. confval:: autodoc_docstring_signature
 

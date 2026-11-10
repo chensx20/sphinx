@@ -17,6 +17,8 @@ Deprecated
 Features added
 --------------
 
+* #8035: autodoc: Allow selecting private members with comma-separated arguments
+  to ``private-members``.
 * #2076: autodoc: Allow overriding of exclude-members in skip-member function
 * #2024: autosummary: Add :confval:`autosummary_filename_map` to avoid conflict
   of filenames between two object with different case
