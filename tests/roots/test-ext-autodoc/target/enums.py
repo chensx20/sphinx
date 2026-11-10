@@ -21,3 +21,14 @@ class EnumCls(enum.Enum):
     def say_goodbye(cls):
         """a classmethod says good-bye to you."""
         pass
+
+
+def enum_func(e: EnumCls = EnumCls.val1) -> None:
+    pass
+
+
+def enum_defaults(e=EnumCls.val4, *, keyword=EnumCls.val2):
+    pass
+
+
+enum_value = EnumCls.val1

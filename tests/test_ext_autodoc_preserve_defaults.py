@@ -15,6 +15,18 @@ from .test_ext_autodoc import do_autodoc
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc',
                     confoverrides={'autodoc_preserve_defaults': True})
+def test_preserve_enum_defaults(app):
+    actual = do_autodoc(app, 'function', 'target.enums.enum_defaults')
+    assert list(actual) == [
+        '',
+        '.. py:function:: enum_defaults(e=EnumCls.val4, *, keyword=EnumCls.val2)',
+        '   :module: target.enums',
+        '',
+    ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc',
+                    confoverrides={'autodoc_preserve_defaults': True})
 def test_preserve_defaults(app):
     options = {"members": None}
     actual = do_autodoc(app, 'module', 'target.preserve_defaults', options)

@@ -457,6 +457,8 @@ def object_description(object: Any) -> str:
         else:
             return "frozenset({%s})" % ", ".join(object_description(x)
                                                  for x in sorted_values)
+    if isenumattribute(object) and object._name_ in type(object).__members__:
+        return '%s.%s' % (type(object).__name__, object._name_)
     try:
         s = repr(object)
     except Exception as exc:

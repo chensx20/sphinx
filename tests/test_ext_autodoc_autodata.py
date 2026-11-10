@@ -17,6 +17,20 @@ from .test_ext_autodoc import do_autodoc
 
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_autodata_enum(app):
+    actual = do_autodoc(app, 'data', 'target.enums.enum_value')
+    assert list(actual) == [
+        '',
+        '.. py:data:: enum_value',
+        '   :module: target.enums',
+        '   :value: EnumCls.val1',
+        '',
+        '   this is enum class',
+        '',
+    ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
 def test_autodata(app):
     actual = do_autodoc(app, 'data', 'target.integer')
     assert list(actual) == [
