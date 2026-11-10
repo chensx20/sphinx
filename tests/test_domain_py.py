@@ -756,7 +756,7 @@ def test_pymethod_options(app):
 
     # :property:
     assert_node(doctree[1][1][8], addnodes.index,
-                entries=[('single', 'meth5() (Class property)', 'Class.meth5', '', None)])
+                entries=[('single', 'meth5 (Class property)', 'Class.meth5', '', None)])
     assert_node(doctree[1][1][9], ([desc_signature, ([desc_annotation, ("property", desc_sig_space)],
                                                      [desc_name, "meth5"])],
                                    [desc_content, ()]))
@@ -782,6 +782,37 @@ def test_pymethod_options(app):
                                     [desc_content, ()]))
     assert 'Class.meth7' in domain.objects
     assert domain.objects['Class.meth7'] == ('index', 'Class.meth7', 'method', False)
+
+
+@pytest.mark.parametrize(('module', 'add_module_names', 'clsname'), [
+    (None, True, 'Foo'),
+    ('example', True, 'example.Foo'),
+    ('example', False, 'Foo'),
+])
+def test_pymethod_property_index(app, module, add_module_names, clsname):
+    app.config.add_module_names = add_module_names
+    text = (".. py:method:: Foo.bar\n"
+            "   :property:\n"
+            "\n"
+            ".. py:property:: Foo.baz\n"
+            "\n"
+            ".. py:method:: Foo.qux\n")
+    if module:
+        text = ".. py:currentmodule:: %s\n\n" % module + text
+    doctree = restructuredtext.parse(app, text)
+    domain = app.env.get_domain('py')
+    prefix = module + '.' if module else ''
+
+    for offset, name, label, objtype in [
+        (0, 'bar', 'bar (%s property)' % clsname, 'method'),
+        (2, 'baz', 'baz (%s property)' % clsname, 'property'),
+        (4, 'qux', 'qux() (%s method)' % clsname, 'method'),
+    ]:
+        target = prefix + 'Foo.' + name
+        assert_node(doctree[offset], addnodes.index,
+                    entries=[('single', label, target, '', None)])
+        assert_node(doctree[offset + 1][0], desc_signature, ids=[target])
+        assert domain.objects[target] == ('index', target, objtype, False)
 
 
 def test_pyclassmethod(app):
