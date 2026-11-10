@@ -984,6 +984,95 @@ def test_info_field_list(app):
                 **{"py:module": "example", "py:class": "Class"})
 
 
+@pytest.mark.parametrize('field,label', [('param', 'Parameters'), ('var', 'Variables')])
+@pytest.mark.parametrize('grouped', [False, True])
+@pytest.mark.parametrize('separate', [False, True])
+@pytest.mark.parametrize('typename,type_nodes', [
+    ('dict(str, str)', ((pending_xref, 'dict'), (addnodes.literal_emphasis, '('),
+                        (pending_xref, 'str'), (addnodes.literal_emphasis, ', '),
+                        (pending_xref, 'str'), (addnodes.literal_emphasis, ')'))),
+    ('dict[str, str]', ((pending_xref, 'dict'), (addnodes.literal_emphasis, '['),
+                        (pending_xref, 'str'), (addnodes.literal_emphasis, ', '),
+                        (pending_xref, 'str'), (addnodes.literal_emphasis, ']'))),
+    ('dict(str, list(int))', ((pending_xref, 'dict'), (addnodes.literal_emphasis, '('),
+                              (pending_xref, 'str'), (addnodes.literal_emphasis, ', '),
+                              (pending_xref, 'list'), (addnodes.literal_emphasis, '('),
+                              (pending_xref, 'int'), (addnodes.literal_emphasis, ')'),
+                              (addnodes.literal_emphasis, ')'))),
+    ('dict[str, list[int]]', ((pending_xref, 'dict'), (addnodes.literal_emphasis, '['),
+                              (pending_xref, 'str'), (addnodes.literal_emphasis, ', '),
+                              (pending_xref, 'list'), (addnodes.literal_emphasis, '['),
+                              (pending_xref, 'int'), (addnodes.literal_emphasis, ']'),
+                              (addnodes.literal_emphasis, ']'))),
+    ('dict(str,str)', ((pending_xref, 'dict'), (addnodes.literal_emphasis, '('),
+                       (pending_xref, 'str'), (addnodes.literal_emphasis, ','),
+                       (pending_xref, 'str'), (addnodes.literal_emphasis, ')'))),
+    ('str', ((pending_xref, 'str'),)),
+])
+def test_info_field_list_inline_type(app, field, label, grouped, separate,
+                                     typename, type_nodes):
+    lines = ['.. py:module:: example', '.. py:class:: Class', '']
+    if separate:
+        typefield = 'type' if field == 'param' else 'vartype'
+        lines += ['   :%s opc_meta: (optional)' % field,
+                  '   :%s opc_meta: %s' % (typefield, typename)]
+    else:
+        lines += ['   :%s %s opc_meta: (optional)' % (field, typename)]
+    if grouped:
+        lines += ['   :%s int count: number of items' % field,
+                  '   :%s name: unchanged description' % field]
+    doctree = restructuredtext.parse(app, '\n'.join(lines))
+    fields = list(doctree.traverse(nodes.field))
+    assert len(fields) == 1
+    assert_node(fields[0][0], [nodes.field_name, label])
+    if grouped:
+        assert_node(fields[0][1], [nodes.field_body, nodes.bullet_list,
+                                   ([nodes.list_item, nodes.paragraph],
+                                    [nodes.list_item, nodes.paragraph],
+                                    [nodes.list_item, nodes.paragraph])])
+        paragraphs = [item[0] for item in fields[0][1][0]]
+    else:
+        assert_node(fields[0][1], [nodes.field_body, nodes.paragraph])
+        paragraphs = [fields[0][1][0]]
+
+    expected_type = tuple([node, addnodes.literal_emphasis, value]
+                          if node is pending_xref else [node, value]
+                          for node, value in type_nodes)
+    assert_node(paragraphs[0], ([addnodes.literal_strong, 'opc_meta'], ' (',
+                                *expected_type, ')', ' -- ', '(optional)'))
+    targets = [value for node, value in type_nodes if node is pending_xref]
+    if grouped:
+        assert_node(paragraphs[1], ([addnodes.literal_strong, 'count'], ' (',
+                                    [pending_xref, addnodes.literal_emphasis, 'int'],
+                                    ')', ' -- ', 'number of items'))
+        assert_node(paragraphs[2], ([addnodes.literal_strong, 'name'], ' -- ',
+                                    'unchanged description'))
+        targets.append('int')
+    references = list(fields[0].traverse(pending_xref))
+    assert len(references) == len(targets)
+    for reference, target in zip(references, targets):
+        assert_node(reference, pending_xref, refdomain='py', reftype='class',
+                    reftarget=target, **{'py:module': 'example', 'py:class': 'Class'})
+
+
+@pytest.mark.parametrize('separate_first', [False, True])
+def test_info_field_list_type_precedence(app, separate_first):
+    fields = ['   :param dict(str, str) opc_meta: (optional)',
+              '   :type opc_meta: int']
+    if separate_first:
+        fields.reverse()
+    text = '\n'.join(['.. py:class:: Class', ''] + fields)
+    doctree = restructuredtext.parse(app, text)
+    paragraph = list(doctree.traverse(nodes.field_body))[0][0]
+    if separate_first:
+        targets = ['dict', 'str', 'str']
+    else:
+        targets = ['int']
+    assert_node(paragraph[0], [addnodes.literal_strong, 'opc_meta'])
+    assert_node(paragraph[-1], '(optional)')
+    assert [node['reftarget'] for node in paragraph.traverse(pending_xref)] == targets
+
+
 def test_info_field_list_var(app):
     text = (".. py:class:: Class\n"
             "\n"

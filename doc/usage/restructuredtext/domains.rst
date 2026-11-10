@@ -537,10 +537,12 @@ This will render like this:
       :raises ValueError: if the message_body exceeds 160 characters
       :raises TypeError: if the message_body is not a basestring
 
-It is also possible to combine parameter type and description, if the type is a
-single word, like this::
+It is also possible to combine parameter type and description. The final
+whitespace-delimited word is the parameter name, and everything before it is
+the type. For example::
 
    :param int priority: The priority of the message, can be a number 1-5
+   :param dict(str, str) opc_meta: (optional)
 
 .. versionadded:: 1.5
 
