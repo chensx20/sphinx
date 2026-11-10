@@ -1,8 +1,11 @@
 """Test the LaTeX writer"""
 
-import pytest
+from unittest import mock
 
-from sphinx.writers.latex import rstdim_to_latexdim
+import pytest
+from docutils import nodes
+
+from sphinx.writers.latex import LaTeXTranslator, rstdim_to_latexdim
 
 
 def test_rstdim_to_latexdim():
@@ -26,3 +29,29 @@ def test_rstdim_to_latexdim():
     with pytest.raises(ValueError):
         rstdim_to_latexdim('unknown')
     assert rstdim_to_latexdim('160.0unknown') == '160.0unknown'
+
+
+@pytest.mark.sphinx('latex', testroot='reST-code-role')
+@pytest.mark.parametrize('payload', [
+    r'\PYG{n}{foo}',
+    ' \t' + r'\PYG{n}{foo}' + ' \t',
+    r'\PYG{n}{foo}' + '\n  ' + r'\PYG{n}{bar}',
+    '\n' + r'\PYG{n}{foo}' + '\n',
+], ids=['tokens', 'horizontal-whitespace', 'internal-newline', 'payload-newlines'])
+def test_highlighted_literal_whitespace(app, payload):
+    app.build()
+    translator = LaTeXTranslator(app.env.get_doctree('index'), app.builder,
+                                 app.builder.themes.get('manual'))
+    node = nodes.literal('', 'foo', classes=['code', 'highlight'], language='python')
+    app.config.highlight_options = {'python': {'stripnl': False}}
+    highlighted = (r'\begin{Verbatim}[commandchars=\\\{\}]' + '\n' +
+                   payload + '\n' + r'\end{Verbatim}' + '\n')
+
+    with mock.patch.object(translator.highlighter, 'highlight_block',
+                           return_value=highlighted) as highlight_block:
+        with pytest.raises(nodes.SkipNode):
+            translator.visit_literal(node)
+
+    highlight_block.assert_called_once_with(
+        'foo', 'python', opts={'stripnl': False}, location=node)
+    assert ''.join(translator.body) == r'\sphinxcode{\sphinxupquote{' + payload + '}}'
