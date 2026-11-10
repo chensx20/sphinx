@@ -411,20 +411,25 @@ def isgenericalias(obj: Any) -> bool:
         return False
 
 
+def _get_class_attribute(cls: Type, name: str, default: Any = None) -> Any:
+    """Look up a class member without invoking metaclass attribute access."""
+    for base in type.__dict__['__mro__'].__get__(cls):
+        namespace = type.__dict__['__dict__'].__get__(base)
+        if name in namespace:
+            return namespace[name]
+    return default
+
+
 def safe_getattr(obj: Any, name: str, *defargs: Any) -> Any:
     """A getattr() that turns all exceptions into AttributeErrors."""
     try:
         if isinstance(obj, type):
-            try:
-                descriptor = inspect.getattr_static(obj, name)
-            except AttributeError:
-                pass
-            else:
+            # Only the immediate metaclass's MRO participates in class lookup.
+            meta_descriptor = _get_class_attribute(type(obj), name)
+            if not inspect.isdatadescriptor(meta_descriptor):
+                descriptor = _get_class_attribute(obj, name, meta_descriptor)
                 if isinstance(descriptor, classmethod) and isproperty(descriptor):
-                    # Metaclass data descriptors take precedence over class members.
-                    meta_descriptor = inspect.getattr_static(type(obj), name, None)
-                    if not inspect.isdatadescriptor(meta_descriptor):
-                        return descriptor
+                    return descriptor
 
         return getattr(obj, name, *defargs)
     except Exception as exc:

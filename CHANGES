@@ -17,7 +17,8 @@ Bugs fixed
 ----------
 
 * #9461: autodoc and autosummary: Document classmethod properties without
-  evaluating their getters, including inherited and abstract properties.
+  evaluating their getters, including inherited and abstract properties,
+  metaclass-of-metaclass descriptors and metaclasses overriding ``__dict__``.
 
 Testing
 --------
