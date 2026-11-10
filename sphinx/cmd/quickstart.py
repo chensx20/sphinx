@@ -89,6 +89,8 @@ class ValidationError(Exception):
 
 
 def is_path(x: str) -> str:
+    if x == '':
+        return x
     x = path.expanduser(x)
     if not path.isdir(x):
         raise ValidationError(__("Please enter a valid path name."))
