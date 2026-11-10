@@ -1709,10 +1709,9 @@ class LaTeXTranslator(SphinxTranslator):
             node.astext(), lang, opts=opts, location=node)
         # TODO: Use nowrap option once LaTeX formatter supports it
         # https://github.com/pygments/pygments/pull/1343
-        hlcode = hlcode.replace(r'\begin{Verbatim}[commandchars=\\\{\}]',
+        hlcode = hlcode.replace(r'\begin{Verbatim}[commandchars=\\\{\}]' + '\n',
                                 r'\sphinxcode{\sphinxupquote{')
-        # get consistent trailer
-        hlcode = hlcode.rstrip()[:-14]  # strip \end{Verbatim}
+        hlcode = hlcode.replace('\n' + r'\end{Verbatim}' + '\n', '')
         self.body.append(hlcode)
         self.body.append('}}')
         raise nodes.SkipNode

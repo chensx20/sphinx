@@ -87,6 +87,7 @@ Features added
 Bugs fixed
 ----------
 
+* #10435: LaTeX: Remove unwanted spaces around highlighted inline code
 * #10200: apidoc: Duplicated submodules are shown for modules having both .pyx
   and .so files
 * #10279: autodoc: Default values for keyword only arguments in overloaded
