@@ -385,6 +385,9 @@ def iscoroutinefunction(obj: Any) -> bool:
 
 def isproperty(obj: Any) -> bool:
     """Check if the object is property."""
+    if isinstance(obj, classmethod):
+        return isinstance(obj.__func__, property)
+
     if sys.version_info >= (3, 8):
         from functools import cached_property  # cached_property is available since py3.8
         if isinstance(obj, cached_property):
@@ -411,6 +414,18 @@ def isgenericalias(obj: Any) -> bool:
 def safe_getattr(obj: Any, name: str, *defargs: Any) -> Any:
     """A getattr() that turns all exceptions into AttributeErrors."""
     try:
+        if isinstance(obj, type):
+            try:
+                descriptor = inspect.getattr_static(obj, name)
+            except AttributeError:
+                pass
+            else:
+                if isinstance(descriptor, classmethod) and isproperty(descriptor):
+                    # Metaclass data descriptors take precedence over class members.
+                    meta_descriptor = inspect.getattr_static(type(obj), name, None)
+                    if not inspect.isdatadescriptor(meta_descriptor):
+                        return descriptor
+
         return getattr(obj, name, *defargs)
     except Exception as exc:
         # sometimes accessing a property raises an exception (e.g.
@@ -837,6 +852,8 @@ def getdoc(obj: Any, attrgetter: Callable = safe_getattr,
     * inherited docstring
     * inherited decorated methods
     """
+    if isinstance(obj, classmethod) and isproperty(obj):
+        obj = obj.__func__
     doc = attrgetter(obj, '__doc__', None)
     if ispartial(obj) and doc == obj.__class__.__doc__:
         return getdoc(obj.func)
@@ -846,7 +863,7 @@ def getdoc(obj: Any, attrgetter: Callable = safe_getattr,
             for basecls in getmro(cls):
                 meth = safe_getattr(basecls, name, None)
                 if meth is not None:
-                    doc = attrgetter(meth, '__doc__', None)
+                    doc = getdoc(meth, attrgetter)
                     if doc is not None:
                         break
 

@@ -517,6 +517,65 @@ def test_generate_autosummary_docs_property(app):
                        ".. autoproperty:: Base.prop")
 
 
+@pytest.mark.sphinx(testroot='ext-autodoc', srcdir='autosummary-class-properties',
+                    confoverrides={'extensions': ['sphinx.ext.autosummary']})
+def test_autosummary_class_properties(app, monkeypatch):
+    from target import properties
+
+    from sphinx.ext.autosummary import Autosummary
+
+    properties.getter_calls.clear()
+    names = ['target.properties.%s.%s' % (cls, name)
+             for cls in ('ClassProperties', 'InheritedProperties', 'SubclassProperties',
+                         'MetaProperties', 'InheritedMetaProperties', 'WithMetaProperties')
+             for name in ('concrete', 'abstract')]
+    for name in names:
+        _, obj, _, _ = import_by_name(name)
+        assert isinstance(obj, classmethod)
+        assert isinstance(obj.__func__, property)
+
+    items = []
+    original_get_items = Autosummary.get_items
+
+    def get_items(self, names):
+        result = original_get_items(self, names)
+        items.extend(result)
+        return result
+
+    monkeypatch.setattr(Autosummary, 'get_items', get_items)
+    source = '.. autosummary::\n   :toctree: generated\n\n   ' + '\n   '.join(names)
+    (app.srcdir / 'index.rst').write_text(source)
+    generate_autosummary_docs([app.srcdir / 'index.rst'], app=app)
+    app.build()
+    assert len(items) == len(names)
+    for name, signature, summary, real_name in items:
+        assert signature == ''
+        assert summary.endswith('descriptor summary.')
+        assert name == real_name
+
+    entries = [AutosummaryEntry(name, 'properties', None, False) for name in names]
+    entries.append(AutosummaryEntry('target.properties.ClassProperties',
+                                    'properties', None, False))
+    with patch('sphinx.ext.autosummary.generate.find_autosummary_in_files',
+               return_value=entries):
+        generate_autosummary_docs([], output_dir=app.srcdir, app=app)
+    for name in names:
+        content = (app.srcdir / (name + '.rst')).read_text()
+        assert '.. autoproperty:: ' + name[len('target.properties.'):] in content
+        assert '.. automethod::' not in content
+    content = (app.srcdir / 'target.properties.ClassProperties.rst').read_text()
+    assert '.. rubric:: Attributes' in content
+    assert '      ~ClassProperties.concrete' in content
+    assert '      ~ClassProperties.abstract' in content
+    methods, attributes = content.split('.. rubric:: Attributes')
+    assert '~ClassProperties.concrete' not in methods
+    assert '~ClassProperties.abstract' not in methods
+    assert '~ClassProperties.concrete' in attributes
+    assert '~ClassProperties.abstract' in attributes
+    assert properties.getter_calls == []
+    assert app._warning.getvalue() == ''
+
+
 @pytest.mark.sphinx(testroot='ext-autosummary-skip-member')
 def test_autosummary_skip_member(app):
     app.build()

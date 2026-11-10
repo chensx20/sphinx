@@ -833,6 +833,27 @@ def test_pyproperty(app):
     assert domain.objects['Class.prop'] == ('index', 'Class.prop', 'property', False)
 
 
+@pytest.mark.parametrize('abstract', [False, True])
+def test_pyproperty_classmethod(app, abstract):
+    text = ('.. py:property:: Class.prop\n'
+            '   :classmethod:\n'
+            '   :type: int\n')
+    if abstract:
+        text += '   :abstractmethod:\n'
+    domain = app.env.get_domain('py')
+    doctree = restructuredtext.parse(app, text)
+    signature = list(doctree.traverse(desc_signature))[0]
+    prefix = 'abstract class property ' if abstract else 'class property '
+    assert signature.astext() == prefix + 'Class.prop: int'
+    assert doctree[0]['entries'] == [
+        ('single', 'prop (Class property)', 'Class.prop', '', None)]
+    assert domain.objects['Class.prop'] == ('index', 'Class.prop', 'property', False)
+    for role in ('attr', 'obj', 'meth'):
+        reference = domain.resolve_xref(app.env, 'index', app.builder, role, 'Class.prop',
+                                        pending_xref(), nodes.literal('', 'Class.prop'))
+        assert reference['refid'] == 'Class.prop'
+
+
 def test_pydecorator_signature(app):
     text = ".. py:decorator:: deco"
     domain = app.env.get_domain('py')

@@ -2666,6 +2666,14 @@ class PropertyDocumenter(DocstringStripSignatureMixin, ClassLevelDocumenter):  #
     def document_members(self, all_members: bool = False) -> None:
         pass
 
+    def import_object(self, raiseerror: bool = False) -> bool:
+        ret = super().import_object(raiseerror)
+        self.isclassmethod = (isinstance(self.object, classmethod) and
+                              inspect.isproperty(self.object))
+        if self.isclassmethod:
+            self.object = self.object.__func__
+        return ret
+
     def get_real_modname(self) -> str:
         real_modname = self.get_attr(self.parent or self.object, '__module__', None)
         return real_modname or self.modname
@@ -2673,6 +2681,8 @@ class PropertyDocumenter(DocstringStripSignatureMixin, ClassLevelDocumenter):  #
     def add_directive_header(self, sig: str) -> None:
         super().add_directive_header(sig)
         sourcename = self.get_sourcename()
+        if self.isclassmethod:
+            self.add_line('   :classmethod:', sourcename)
         if inspect.isabstractmethod(self.object):
             self.add_line('   :abstractmethod:', sourcename)
 

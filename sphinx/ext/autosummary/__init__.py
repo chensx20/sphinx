@@ -87,6 +87,7 @@ from sphinx.registry import SphinxComponentRegistry
 from sphinx.util import logging, rst
 from sphinx.util.docutils import (NullReporter, SphinxDirective, SphinxRole, new_document,
                                   switch_source_input)
+from sphinx.util.inspect import safe_getattr
 from sphinx.util.matching import Matcher
 from sphinx.util.typing import OptionSpec
 from sphinx.writers.html import HTMLTranslator
@@ -642,7 +643,7 @@ def _import_by_name(name: str) -> Tuple[Any, Any, str]:
         if modname:
             try:
                 mod = import_module(modname)
-                return getattr(mod, name_parts[-1]), mod, modname
+                return safe_getattr(mod, name_parts[-1]), mod, modname
             except (ImportError, IndexError, AttributeError):
                 pass
 
@@ -665,7 +666,7 @@ def _import_by_name(name: str) -> Tuple[Any, Any, str]:
             obj = sys.modules[modname]
             for obj_name in name_parts[last_j:]:
                 parent = obj
-                obj = getattr(obj, obj_name)
+                obj = safe_getattr(obj, obj_name)
             return obj, parent, modname
         else:
             return sys.modules[modname], None, modname

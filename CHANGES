@@ -16,6 +16,9 @@ Features added
 Bugs fixed
 ----------
 
+* #9461: autodoc and autosummary: Document classmethod properties without
+  evaluating their getters, including inherited and abstract properties.
+
 Testing
 --------
 
