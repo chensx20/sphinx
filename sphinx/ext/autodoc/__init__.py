@@ -26,8 +26,8 @@ from sphinx.config import ENUM, Config
 from sphinx.deprecation import (RemovedInSphinx40Warning, RemovedInSphinx50Warning,
                                 RemovedInSphinx60Warning)
 from sphinx.environment import BuildEnvironment
-from sphinx.ext.autodoc.importer import (get_class_members, get_module_members,
-                                         get_object_members, import_object)
+from sphinx.ext.autodoc.importer import (get_class_analyzers, get_class_members,
+                                         get_module_members, get_object_members, import_object)
 from sphinx.ext.autodoc.mock import mock
 from sphinx.locale import _, __
 from sphinx.pycode import ModuleAnalyzer, PycodeError
@@ -584,6 +584,22 @@ class Documenter:
         else:
             return 'docstring of %s' % fullname
 
+    def get_attribute_docs(self, parent: Any, namespace: str) -> Dict[str, List[str]]:
+        """Find source documentation, including class namespaces in MRO order."""
+        attr_docs = {}  # type: Dict[str, List[str]]
+        if self.analyzer:
+            for (ns, name), docstring in self.analyzer.find_attr_docs().items():
+                if ns == namespace:
+                    attr_docs[name] = docstring
+
+        for cls, analyzer in get_class_analyzers(parent):
+            self.directive.filename_set.add(analyzer.srcname)
+            for (ns, name), docstring in analyzer.attr_docs.items():
+                if ns == cls.__qualname__:
+                    attr_docs.setdefault(name, docstring)
+
+        return attr_docs
+
     def add_content(self, more_content: Optional[StringList], no_docstring: bool = False
                     ) -> None:
         """Add content from docstrings, attribute documentation and user."""
@@ -594,18 +610,15 @@ class Documenter:
 
         # set sourcename and add content from attribute documentation
         sourcename = self.get_sourcename()
-        if self.analyzer:
-            attr_docs = self.analyzer.find_attr_docs()
-            if self.objpath:
-                key = ('.'.join(self.objpath[:-1]), self.objpath[-1])
-                if key in attr_docs:
-                    no_docstring = True
-                    # make a copy of docstring for attributes to avoid cache
-                    # the change of autodoc-process-docstring event.
-                    docstrings = [list(attr_docs[key])]
+        if self.objpath:
+            attr_docs = self.get_attribute_docs(self.parent, '.'.join(self.objpath[:-1]))
+            if self.objpath[-1] in attr_docs:
+                no_docstring = True
+                # Copy attribute docstrings before callbacks modify them.
+                docstrings = [list(attr_docs[self.objpath[-1]])]
 
-                    for i, line in enumerate(self.process_doc(docstrings)):
-                        self.add_line(line, sourcename, i)
+                for i, line in enumerate(self.process_doc(docstrings)):
+                    self.add_line(line, sourcename, i)
 
         # add content from docstrings
         if not no_docstring:
@@ -666,6 +679,11 @@ class Documenter:
         The user can override the skipping decision by connecting to the
         ``autodoc-skip-member`` event.
         """
+        class_attr_docs = {
+            cls: {name for ns, name in analyzer.attr_docs if ns == cls.__qualname__}
+            for cls, analyzer in get_class_analyzers(self.object)
+        }
+
         def is_filtered_inherited_member(name: str) -> bool:
             if inspect.isclass(self.object):
                 for cls in self.object.__mro__:
@@ -674,7 +692,9 @@ class Documenter:
                         return True
                     elif name in cls.__dict__:
                         return False
-                    elif name in self.get_attr(cls, '__annotations__', {}):
+                    elif name in cls.__dict__.get('__annotations__', {}):
+                        return False
+                    elif name in class_attr_docs.get(cls, set()):
                         return False
 
             return False
@@ -684,10 +704,7 @@ class Documenter:
         # search for members in source code too
         namespace = '.'.join(self.objpath)  # will be empty for modules
 
-        if self.analyzer:
-            attr_docs = self.analyzer.find_attr_docs()
-        else:
-            attr_docs = {}
+        attr_docs = self.get_attribute_docs(self.object, namespace)
 
         # process members and determine which to skip
         for obj in members:
@@ -715,6 +732,9 @@ class Documenter:
             if isinstance(obj, ObjectMember) and obj.docstring:
                 # hack for ClassDocumenter to inject docstring via ObjectMember
                 doc = obj.docstring
+
+            if inspect.isclass(self.object) and membername in attr_docs:
+                doc = '\n'.join(attr_docs[membername])
 
             has_doc = bool(doc)
 
@@ -746,15 +766,17 @@ class Documenter:
                         keep = has_doc or self.options.undoc_members
                 else:
                     keep = False
-            elif (namespace, membername) in attr_docs:
+            elif membername in attr_docs:
                 if want_all and isprivate:
                     if self.options.private_members is None:
+                        keep = False
+                    elif is_filtered_inherited_member(membername):
                         keep = False
                     else:
                         keep = membername in self.options.private_members
                 else:
                     # keep documented attributes
-                    keep = True
+                    keep = not (want_all and is_filtered_inherited_member(membername))
                 isattr = True
             elif want_all and isprivate:
                 if has_doc or self.options.undoc_members:
@@ -2161,22 +2183,12 @@ class UninitializedInstanceAttributeMixin(DataDocumenterMixinBase):
     """
 
     def get_attribute_comment(self, parent: Any) -> Optional[List[str]]:
-        try:
-            for cls in inspect.getmro(parent):
-                try:
-                    module = safe_getattr(cls, '__module__')
-                    qualname = safe_getattr(cls, '__qualname__')
-
-                    analyzer = ModuleAnalyzer.for_module(module)
-                    analyzer.analyze()
-                    if qualname and self.objpath:
-                        key = (qualname, self.objpath[-1])
-                        if key in analyzer.attr_docs:
-                            return list(analyzer.attr_docs[key])
-                except (AttributeError, PycodeError):
-                    pass
-        except (AttributeError, PycodeError):
-            pass
+        for cls, analyzer in get_class_analyzers(parent):
+            self.directive.filename_set.add(analyzer.srcname)
+            if self.objpath:
+                key = (cls.__qualname__, self.objpath[-1])
+                if key in analyzer.attr_docs:
+                    return list(analyzer.attr_docs[key])
 
         return None
 
