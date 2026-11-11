@@ -309,6 +309,40 @@ def test_signature_from_str_default_values():
     assert sig.parameters['m'].default == 'foo.bar.CONSTANT'
 
 
+@pytest.mark.parametrize('default', ['()', '(1,)', '(1, 1, 1)', '((1, 2), (3,), ())'])
+def test_signature_from_str_tuple_defaults(default):
+    sig = inspect.signature_from_str(
+        '(lines, color=%s, width=5, label=None, name=None)' % default)
+    assert list(sig.parameters) == ['lines', 'color', 'width', 'label', 'name']
+    assert [p.name for p in sig.parameters.values()] == list(sig.parameters)
+    assert all(p.kind == Parameter.POSITIONAL_OR_KEYWORD for p in sig.parameters.values())
+    assert all(p.annotation is Parameter.empty for p in sig.parameters.values())
+    assert [p.default for p in sig.parameters.values()] == [
+        Parameter.empty, default, '5', 'None', 'None']
+    assert sig.return_annotation is Parameter.empty
+
+    sig = inspect.signature_from_str('(lines: str, *, color: tuple = %s, width=5)' % default)
+    assert list(sig.parameters) == ['lines', 'color', 'width']
+    assert sig.parameters['lines'].kind == Parameter.POSITIONAL_OR_KEYWORD
+    assert sig.parameters['lines'].annotation == 'str'
+    assert sig.parameters['color'].kind == Parameter.KEYWORD_ONLY
+    assert sig.parameters['color'].annotation == 'tuple'
+    assert sig.parameters['color'].default == default
+    assert sig.parameters['width'].kind == Parameter.KEYWORD_ONLY
+    assert sig.parameters['width'].default == '5'
+
+
+@pytest.mark.skipif(sys.version_info < (3, 8), reason='python 3.8+ is required.')
+def test_signature_from_str_tuple_defaults_posonly():
+    sig = inspect.signature_from_str('(color: tuple = (1,), /, *, width=5)')
+    assert list(sig.parameters) == ['color', 'width']
+    assert sig.parameters['color'].kind == Parameter.POSITIONAL_ONLY
+    assert sig.parameters['color'].annotation == 'tuple'
+    assert sig.parameters['color'].default == '(1,)'
+    assert sig.parameters['width'].kind == Parameter.KEYWORD_ONLY
+    assert sig.parameters['width'].default == '5'
+
+
 def test_signature_from_str_annotations():
     signature = '(a: int, *args: bytes, b: str = "blah", **kwargs: float) -> None'
     sig = inspect.signature_from_str(signature)

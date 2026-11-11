@@ -53,7 +53,16 @@ from sphinx.pycode import ast
     ("+ a", "+ a"),                             # UAdd
     ("- 1", "- 1"),                             # UnaryOp
     ("- a", "- a"),                             # USub
-    ("(1, 2, 3)", "1, 2, 3"),                   # Tuple
+    ("(1, 2, 3)", "(1, 2, 3)"),                 # Tuple
+    ("(1,)", "(1,)"),                           # Tuple (singleton)
+    ("((1, 2), (3,), ())", "((1, 2), (3,), ())"),
+    ("[(1, 2)]", "[(1, 2)]"),
+    ("f((1, 2), value=(3,))", "f((1, 2), value=(3,))"),
+    ("Callable[[int, int], int]", "Callable[[int, int], int]"),
+    ("array[1, 2]", "array[1, 2]"),
+    ("Tuple[()]", "Tuple[()]"),
+    ("array[1,]", "array[1,]"),
+    ("array[(1, 2), 3]", "array[(1, 2), 3]"),
     ("()", "()"),                               # Tuple (empty)
 ])
 def test_unparse(source, expected):

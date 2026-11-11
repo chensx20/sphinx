@@ -26,6 +26,7 @@ Features added
 Bugs fixed
 ----------
 
+* #8265: autodoc: Preserve parentheses around tuple defaults in signatures
 * #8085: i18n: Add support for having single text domain
 * #8143: autodoc: AttributeError is raised when False value is passed to
   autodoc_default_options
