@@ -31,6 +31,8 @@ Deprecated
 Features added
 --------------
 
+* #11510: Add the ``include-read`` event to transform selected included content
+  before parsing, independently of ``source-read``.
 * #11526: Support ``os.PathLike`` types and ``pathlib.Path`` objects
   in many more places.
 * #5474: coverage: Print summary statistics tables.

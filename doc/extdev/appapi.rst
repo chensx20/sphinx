@@ -175,6 +175,9 @@ type for that event:
          6. source-read(app, docname, source)
          7. run source parsers: text -> docutils.document
             - parsers can be added with the app.add_source_parser() API
+            - include-read(app, relative_path, parent_docname, content) is emitted
+              for includes inserted into the parser, including nested and
+              repeated includes
          8. apply transforms based on priority: docutils.document -> docutils.document
             - event.doctree-read(app, doctree) is called in the middle of transforms,
               transforms come before/after this event depending on their priority.
@@ -250,7 +253,10 @@ Here is a more detailed list of these events.
 
 .. event:: source-read (app, docname, source)
 
-   Emitted when a source file has been read.  The *source* argument is a list
+   Emitted when a document source file has been read, before parsing.
+   This is not emitted for files read by the :dudir:`include` directive;
+   use :event:`include-read` to transform included content.
+   The *source* argument is a list
    whose single element is the contents of the source file.  You can process the
    contents and replace this item to implement source-level transformations.
 
@@ -259,6 +265,42 @@ Here is a more detailed list of these events.
    ``:math:`...```.
 
    .. versionadded:: 0.5
+
+.. event:: include-read (app, relative_path, parent_docname, content)
+
+   Emitted when the :dudir:`include` directive has read and selected content,
+   before inserting it into the parser. *relative_path* is a :class:`pathlib.Path`
+   relative to the source directory. *parent_docname* is the name of the owning
+   Sphinx document, including for nested includes; ``app.env.docname`` is unchanged.
+   *content* is a list whose single string element contains the selected lines,
+   joined with newlines. Replace this element to transform the included content.
+   Listeners run in priority order and parsing uses the final value.
+
+   The event is emitted once per insertion, including repeated and nested
+   includes and files that are not themselves Sphinx documents. Docutils applies
+   ``start-line``, ``end-line``, ``start-after`` and ``end-before`` before the event.
+   Docutils control lines are excluded from *content*. Standard includes such as
+   ``<isonum.txt>``, ``:literal:`` and ``:code:`` includes, and
+   :rst:dir:`literalinclude` do not emit this event. Includes with an explicit
+   ``:parser:`` use a separate Docutils parser instead of inserting input into
+   the current parser and do not emit this event.
+
+   Extensions using :event:`source-read` should subscribe explicitly to both
+   events to transform documents and included content, for example::
+
+      def source_read(app, docname, source):
+          source[0] = source[0].replace('&REPLACE_ME;', 'REPLACED')
+
+      def include_read(app, relative_path, parent_docname, content):
+          source_read(app, parent_docname, content)
+
+      def setup(app):
+          app.connect('source-read', source_read)
+          app.connect('include-read', include_read)
+
+   Transformations affect parsing only; source files on disk are not modified.
+
+   .. versionadded:: 7.2
 
 .. event:: object-description-transform (app, domain, objtype, contentnode)
 
