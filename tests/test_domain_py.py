@@ -311,6 +311,18 @@ def test_pyfunction_signature(app):
                                                       [nodes.inline, pending_xref, "str"])])
 
 
+@pytest.mark.parametrize('default', ['()', '(1,)', '(1, 1, 1)', '((1, 2), (3,), ())'])
+def test_pymethod_tuple_defaults(app, default):
+    text = ('.. py:method:: Lines.add_lines(lines, color=%s, width=5, label=None, name=None)'
+            % default)
+    doctree = restructuredtext.parse(app, text)
+    parameters = list(doctree.traverse(desc_parameter))
+    assert [p.astext() for p in parameters] == [
+        'lines', 'color=' + default, 'width=5', 'label=None', 'name=None']
+    assert [n.astext() for n in doctree.traverse(nodes.inline)
+            if 'default_value' in n['classes']] == [default, '5', 'None', 'None']
+
+
 def test_pyfunction_signature_full(app):
     text = (".. py:function:: hello(a: str, b = 1, *args: str, "
             "c: bool = True, **kwargs: str) -> str")

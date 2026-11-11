@@ -13,6 +13,7 @@ import sys
 from unittest.mock import Mock
 from warnings import catch_warnings
 
+import html5lib
 import pytest
 from docutils.statemachine import ViewList
 
@@ -74,6 +75,29 @@ def make_directive_bridge(env):
     directive.state.document.settings.tab_width = 8
 
     return directive
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_autodoc_tuple_defaults(app):
+    name = 'target.tuple_defaults.Lines.add_lines'
+    signature = 'add_lines(lines, color=(1, 1, 1), width=5, label=None, name=None)'
+    actual = do_autodoc(app, 'method', name)
+    assert '.. py:method:: Lines.' + signature in actual
+
+    app.build()
+    doctree = app.env.get_doctree('tuple-defaults')
+    parameters = list(doctree.traverse(addnodes.desc_parameter))
+    assert [p.astext() for p in parameters] == [
+        'lines', 'color=(1, 1, 1)', 'width=5', 'label=None', 'name=None']
+    assert parameters[1][-1].astext() == '(1, 1, 1)'
+    assert 'default_value' in parameters[1][-1]['classes']
+
+    html = html5lib.parse((app.outdir / 'tuple-defaults.html').read_text(),
+                          namespaceHTMLElements=False)
+    signatures = [n for n in html.iter('dt') if n.get('id') == name]
+    assert len(signatures) == 1
+    text = ''.join(signatures[0].itertext()).replace('\xa0', ' ').strip()
+    assert text == 'Lines.' + signature + '\xb6'
 
 
 processed_signatures = []
