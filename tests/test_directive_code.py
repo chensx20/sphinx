@@ -216,6 +216,100 @@ def test_LiteralIncludeReader_prepend(literal_inc_path):
                        "Sphinx\n")
 
 
+def test_LiteralIncludeReader_prepend_alignment(testroot):
+    source = testroot / 'indent.inc'
+    expected = ("      <plugin>\n"
+                "        <groupId>example</groupId>\n"
+                "      </plugin>\n"
+                "      </plugin>\n")
+    for options in [
+            {'prepend': '<plugin>', 'append': '</plugin>', 'lines': '2-3'},
+            {'prepend': '<plugin>', 'append': '</plugin>', 'start-at': '<groupId>',
+             'end-at': '</plugin>'},
+    ]:
+        reader = LiteralIncludeReader(source, options, DUMMY_CONFIG)
+        content, count = reader.read()
+        assert content == expected
+        assert count == 4
+
+
+@pytest.mark.parametrize('insertions', [
+    {'prepend': 'start'}, {'append': 'end'}, {'prepend': 'start', 'append': 'end'},
+])
+@pytest.mark.parametrize('dedent, margin', [
+    ({}, 4), ({'dedent': 0}, 4), ({'dedent': 2}, 2), ({'dedent': 4}, 0),
+    ({'dedent': None}, 0),
+])
+@pytest.mark.sphinx()
+def test_LiteralIncludeReader_prepend_alignment_dedent(literal_inc_path, insertions,
+                                                       dedent, margin, app, warning):
+    options = dict(insertions, lines='9-10', **dedent)
+    reader = LiteralIncludeReader(literal_inc_path, options, DUMMY_CONFIG)
+    content, count = reader.read()
+    expected = ' ' * margin + 'def baz():\n' + ' ' * (margin + 4) + 'pass\n'
+    if 'prepend' in insertions:
+        expected = ' ' * margin + 'start\n' + expected
+    if 'append' in insertions:
+        expected += ' ' * margin + 'end\n'
+    assert content == expected
+    assert count == 2 + len(insertions)
+    assert not warning.getvalue()
+
+
+@pytest.mark.parametrize('source_text, options, selected, indent', [
+    ('', {}, '', ''),
+    (' \t\n\n', {}, ' \t\n\n', ''),
+    ('\n    value\n \t\n', {}, '\n    value\n \t\n', '    '),
+    ('\t value\n\t  child\n', {}, '\t value\n\t  child\n', '\t '),
+    ('\tvalue\n    child\n', {}, '\tvalue\n    child\n', ''),
+    ('\tvalue\n\t\tchild\n', {'tab-width': 4}, '    value\n        child\n', '    '),
+    ('\tvalue\n\t\tchild\n', {'tab-width': 8}, '        value\n                child\n', '        '),
+    ('marker\n', {'start-after': 'marker'}, '', ''),
+    ('outside\n    begin\n        child\n    end\noutside\n',
+     {'start-after': 'outside', 'end-before': 'outside'},
+     '    begin\n        child\n    end\n', '    '),
+    ('    value', {}, '    value', '    '),
+])
+def test_LiteralIncludeReader_prepend_alignment_whitespace(
+        tmp_path, source_text, options, selected, indent):
+    source = tmp_path / 'source.inc'
+    source.write_text(source_text, encoding='utf8')
+    options = dict(options, prepend=' start ', append=' end ')
+    reader = LiteralIncludeReader(source, options,
+                                  DUMMY_CONFIG)
+    content, count = reader.read()
+    assert content == indent + ' start \n' + selected + indent + ' end \n'
+    assert count == len(selected.splitlines()) + 2
+
+
+@pytest.mark.sphinx()
+def test_LiteralIncludeReader_prepend_excessive_dedent(literal_inc_path, app, warning):
+    options = {'lines': '9-10', 'prepend': 'start', 'append': 'end', 'dedent': 6}
+    reader = LiteralIncludeReader(literal_inc_path, options, DUMMY_CONFIG)
+    assert reader.read() == ('art\nf baz():\n  pass\nd\n', 4)
+    assert 'non-whitespace stripped by dedent' in warning.getvalue()
+
+
+@pytest.mark.parametrize('option', ['prepend', 'append'])
+def test_LiteralIncludeReader_insert_lineno_match(literal_inc_path, option):
+    with pytest.raises(ValueError, match='Cannot use both'):
+        LiteralIncludeReader(literal_inc_path, {'lineno-match': True, option: 'text'},
+                             DUMMY_CONFIG)
+
+
+@pytest.mark.sphinx('html', testroot='directive-code')
+def test_literal_include_prepend_alignment(app, status, warning, monkeypatch):
+    monkeypatch.setattr(app, 'warningiserror', True)
+    app.builder.build_all()
+    assert not warning.getvalue()
+    blocks = list(app.env.get_doctree('prepend').traverse(nodes.literal_block))
+    assert [block.astext() for block in blocks] == [
+        '      <plugin>\n        <groupId>example</groupId>\n      </plugin>\n      </plugin>\n',
+        '    <plugin>\n      <groupId>example</groupId>\n    </plugin>\n    </plugin>\n',
+        '<plugin>\n  <groupId>example</groupId>\n</plugin>\n</plugin>\n',
+    ]
+
+
 @pytest.mark.xfail(os.name != 'posix', reason="Not working on windows")
 def test_LiteralIncludeReader_dedent(literal_inc_path):
     # dedent: 2

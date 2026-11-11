@@ -220,18 +220,29 @@ class LiteralIncludeReader:
         if 'diff' in self.options:
             lines = self.show_diff()
         else:
-            filters = [self.pyobject_filter,
-                       self.start_filter,
-                       self.end_filter,
-                       self.lines_filter,
-                       self.prepend_filter,
-                       self.append_filter,
-                       self.dedent_filter]
             lines = self.read_file(self.filename, location=location)
+            filters = [self.pyobject_filter, self.start_filter, self.end_filter,
+                       self.lines_filter]
             for func in filters:
                 lines = func(lines, location=location)
+            indent = self.get_indent(lines)
+            lines = self.prepend_filter(lines, location=location, indent=indent)
+            lines = self.append_filter(lines, location=location, indent=indent)
+            lines = self.dedent_filter(lines, location=location)
 
         return ''.join(lines), len(lines)
+
+    def get_indent(self, lines: List[str]) -> str:
+        nonblank = [line for line in lines if line.strip()]
+        if not nonblank:
+            return ''
+
+        indent = nonblank[0][:len(nonblank[0]) - len(nonblank[0].lstrip(' \t'))]
+        for line in nonblank[1:]:
+            line_indent = line[:len(line) - len(line.lstrip(' \t'))]
+            while not line_indent.startswith(indent):
+                indent = indent[:-1]
+        return indent
 
     def show_diff(self, location: Tuple[str, int] = None) -> List[str]:
         new_lines = self.read_file(self.filename)
@@ -340,17 +351,19 @@ class LiteralIncludeReader:
 
         return lines
 
-    def prepend_filter(self, lines: List[str], location: Tuple[str, int] = None) -> List[str]:
+    def prepend_filter(self, lines: List[str], location: Tuple[str, int] = None,
+                       indent: str = '') -> List[str]:
         prepend = self.options.get('prepend')
         if prepend:
-            lines.insert(0, prepend + '\n')
+            lines.insert(0, indent + prepend + '\n')
 
         return lines
 
-    def append_filter(self, lines: List[str], location: Tuple[str, int] = None) -> List[str]:
+    def append_filter(self, lines: List[str], location: Tuple[str, int] = None,
+                      indent: str = '') -> List[str]:
         append = self.options.get('append')
         if append:
-            lines.append(append + '\n')
+            lines.append(indent + append + '\n')
 
         return lines
 

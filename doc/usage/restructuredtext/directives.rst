@@ -730,6 +730,10 @@ __ https://pygments.org/docs/lexers
    You can prepend and/or append a line to the included code, using the
    ``prepend`` and ``append`` option, respectively.  This is useful e.g. for
    highlighting PHP code that doesn't include the ``<?php``/``?>`` markers.
+   These lines are automatically indented to match the longest common leading
+   whitespace of the selected source lines. Blank lines are ignored. The
+   ``dedent`` option is applied afterwards, to the inserted lines as well as
+   the selected source lines.
 
    If you want to show the diff of the code, you can specify the old file by
    giving a ``diff`` option::

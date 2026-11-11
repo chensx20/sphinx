@@ -65,6 +65,8 @@ Features added
 Bugs fixed
 ----------
 
+* #1: literalinclude: Align ``prepend`` and ``append`` lines with the selected
+  source code indentation.
 * #10279: autodoc: Default values for keyword only arguments in overloaded
   functions are rendered as a string literal
 * #10236: html search: objects are duplicated in search result
