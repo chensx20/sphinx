@@ -1037,39 +1037,53 @@ class DocstringSignatureMixin:
     feature of reading the signature from the docstring.
     """
 
+    _docstring_signatures = None  # type: Optional[List[Tuple[str, str]]]
+
     def _find_signature(self, encoding: str = None) -> Tuple[str, str]:
         if encoding is not None:
             warnings.warn("The 'encoding' argument to autodoc.%s._find_signature() is "
                           "deprecated." % self.__class__.__name__,
                           RemovedInSphinx40Warning, stacklevel=2)
+        signatures = self._find_signatures()
+        return signatures[0] if signatures else None
+
+    def _find_signatures(self) -> List[Tuple[str, str]]:
+        if self._docstring_signatures is not None:
+            return self._docstring_signatures
+
         docstrings = self.get_doc()
         self._new_docstrings = docstrings[:]
-        result = None
+        self._docstring_signatures = []
         for i, doclines in enumerate(docstrings):
-            # no lines in docstring, no match
-            if not doclines:
+            if not doclines or not py_ext_sig_re.match(doclines[0]):
                 continue
-            # match first line of docstring against signature RE
-            match = py_ext_sig_re.match(doclines[0])
-            if not match:
-                continue
-            exmod, path, base, args, retann = match.groups()
-            # the base name must match ours
             valid_names = [self.objpath[-1]]  # type: ignore
             if isinstance(self, ClassDocumenter):
                 valid_names.append('__init__')
                 if hasattr(self.object, '__mro__'):
                     valid_names.extend(cls.__name__ for cls in self.object.__mro__)
-            if base not in valid_names:
+            for line in doclines:
+                match = py_ext_sig_re.match(line)
+                if not match:
+                    break
+                exmod, path, base, args, retann = match.groups()
+                if base not in valid_names:
+                    break
+                # A bare name is accepted only as the first signature.
+                if args is None and self._docstring_signatures:
+                    break
+                self._docstring_signatures.append((args, retann))
+                if args is None:
+                    break
+            if not self._docstring_signatures:
                 continue
             # re-prepare docstring to ignore more leading indentation
             tab_width = self.directive.state.document.settings.tab_width  # type: ignore
-            self._new_docstrings[i] = prepare_docstring('\n'.join(doclines[1:]),
-                                                        tabsize=tab_width)
-            result = args, retann
+            self._new_docstrings[i] = prepare_docstring(
+                '\n'.join(doclines[len(self._docstring_signatures):]), tabsize=tab_width)
             # don't look any further
             break
-        return result
+        return self._docstring_signatures
 
     def get_doc(self, encoding: str = None, ignore: int = None) -> List[List[str]]:
         if encoding is not None:
@@ -1085,9 +1099,16 @@ class DocstringSignatureMixin:
         if self.args is None and self.env.config.autodoc_docstring_signature:  # type: ignore
             # only act if a signature is not explicitly given already, and if
             # the feature is enabled
-            result = self._find_signature()
-            if result is not None:
-                self.args, self.retann = result
+            signatures = self._find_signatures()
+            if signatures:
+                old_args, old_retann = self.args, self.retann
+                try:
+                    formatted_signatures = []
+                    for self.args, self.retann in signatures:
+                        formatted_signatures.append(super().format_signature(**kwargs))
+                    return '\n'.join(formatted_signatures)
+                finally:
+                    self.args, self.retann = old_args, old_retann
         return super().format_signature(**kwargs)  # type: ignore
 
 
@@ -1106,7 +1127,7 @@ class DocstringStripSignatureMixin(DocstringSignatureMixin):
                 # DocstringSignatureMixin.format_signature.
                 # Documenter.format_signature use self.args value to format.
                 _args, self.retann = result
-        return super().format_signature(**kwargs)
+        return super(DocstringSignatureMixin, self).format_signature(**kwargs)
 
 
 class FunctionDocumenter(DocstringSignatureMixin, ModuleLevelDocumenter):  # type: ignore

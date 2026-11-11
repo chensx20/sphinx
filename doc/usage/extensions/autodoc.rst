@@ -450,9 +450,11 @@ There are also config values that you can set:
    function's docstring.
 
    If this boolean value is set to ``True`` (which is the default), autodoc will
-   look at the first line of the docstring for functions and methods, and if it
-   looks like a signature, use the line as the signature and remove it from the
-   docstring content.
+   look at the beginning of the docstring for functions and methods. If it
+   contains consecutive signature lines for the object, autodoc uses all of
+   them as overload signatures and removes them from the docstring content.
+   Each signature must be on a single line. A blank line, prose, or a signature
+   for a different object ends the block; later signatures remain in the body.
 
    .. versionadded:: 1.1
 
