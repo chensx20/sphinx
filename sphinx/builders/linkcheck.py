@@ -16,7 +16,7 @@ import threading
 from html.parser import HTMLParser
 from os import path
 from typing import Any, Dict, List, Set, Tuple
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, urlparse, urlsplit
 
 from docutils import nodes
 from docutils.nodes import Node
@@ -77,7 +77,7 @@ def check_anchor(response: requests.requests.Response, anchor: str) -> bool:
 
 class CheckExternalLinksBuilder(Builder):
     """
-    Checks for broken external links.
+    Checks for broken external and local links.
     """
     name = 'linkcheck'
     epilog = __('Look for any errors in the above output or in '
@@ -213,7 +213,17 @@ class CheckExternalLinksBuilder(Builder):
             if len(uri) == 0 or uri.startswith(('#', 'mailto:', 'ftp:')):
                 return 'unchecked', '', 0
             elif not uri.startswith(('http:', 'https:')):
-                return 'local', '', 0
+                parsed = urlsplit(uri)
+                if parsed.scheme or parsed.netloc:
+                    return 'local', '', 0
+                for rex in self.to_ignore:
+                    if rex.match(uri):
+                        return 'ignored', '', 0
+                filename = unquote(parsed.path)
+                _, filename = self.env.relfn2path(filename, docname)
+                if path.exists(filename):
+                    return 'local', '', 0
+                return 'broken', __('Local file not found'), 0
             elif uri in self.good:
                 return 'working', 'old', 0
             elif uri in self.broken:
@@ -275,9 +285,10 @@ class CheckExternalLinksBuilder(Builder):
             logger.info(darkgreen('ok        ') + uri + info)
             self.write_linkstat(linkstat)
         elif status == 'broken':
+            self.app.statuscode = 1
             if self.app.quiet or self.app.warningiserror:
                 logger.warning(__('broken link: %s (%s)'), uri, info,
-                               location=(filename, lineno))
+                               location=(docname, lineno))
             else:
                 logger.info(red('broken    ') + uri + red(' - ' + info))
             self.write_entry('broken', docname, filename, lineno, uri + ': ' + info)
@@ -333,9 +344,6 @@ class CheckExternalLinksBuilder(Builder):
         while done < n:
             self.process_result(self.rqueue.get())
             done += 1
-
-        if self.broken:
-            self.app.statuscode = 1
 
     def write_entry(self, what: str, docname: str, filename: str, line: int,
                     uri: str) -> None:

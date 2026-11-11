@@ -432,6 +432,15 @@ name is ``rinoh``. Refer to the `rinohtype manual`_ for details.
    ``requests``, and writes an overview which ones are broken and redirected to
    standard output and to :file:`output.txt` in the output directory.
 
+   Local hyperlinks are checked for existence in the source filesystem, relative
+   to the referring document.  Paths starting with ``/`` are relative to the
+   source directory.  Files and directories are accepted; percent escapes are
+   decoded and query strings and fragments are ignored when checking existence.
+   Missing targets are reported as broken links and cause the build to fail.
+   Local anchors are not checked, and generated HTML targets are not inferred
+   from source documents.  Use :confval:`linkcheck_ignore` to exclude local links
+   from checking.
+
    .. autoattribute:: name
 
    .. autoattribute:: format
