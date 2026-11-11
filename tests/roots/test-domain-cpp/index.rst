@@ -1,6 +1,10 @@
 test-domain-cpp
 ===============
 
+.. toctree::
+
+   user-defined-literals
+
 directives
 ----------
 

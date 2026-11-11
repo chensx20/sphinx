@@ -9,6 +9,7 @@
 """
 
 import re
+from html import unescape
 
 import pytest
 
@@ -30,6 +31,26 @@ def parse(name, string):
     # The scopedness would usually have been set by CPPEnumObject
     if name == "enum":
         ast.scoped = None  # simulate unscoped enum
+    return ast
+
+
+def parse_expression(expression):
+    class Config:
+        cpp_id_attributes = ["id_attr"]
+        cpp_paren_attributes = ["paren_attr"]
+    parser = DefinitionParser(expression, location=None, config=Config())
+    parser.allowFallbackExpressionParsing = False
+    ast = parser.parse_expression()
+    parser.assert_end()
+    return ast
+
+
+def strip_expression_wrappers(ast):
+    while isinstance(ast, cppDomain.ASTBinOpExpr) and not ast.ops:
+        assert len(ast.exprs) == 1
+        ast = ast.exprs[0]
+    if isinstance(ast, cppDomain.ASTPostfixExpr) and not ast.postFixes:
+        return ast.prefix
     return ast
 
 
@@ -176,7 +197,6 @@ def test_expressions():
         exprCheck(p + "'\\U0001f34c'", t + "127820")
         exprCheck(p + "'\\U0001F34C'", t + "127820")
 
-    # TODO: user-defined lit
     exprCheck('(... + Ns)', '(... + Ns)', id4='flpl2Ns')
     exprCheck('(Ns + ...)', '(Ns + ...)', id4='frpl2Ns')
     exprCheck('(Ns + ... + 0)', '(Ns + ... + 0)', id4='fLpl2NsL0E')
@@ -776,6 +796,118 @@ def test_template_args():
           {2: "I0E21enable_if_not_array_t"})
 
 
+@pytest.mark.parametrize('literal, suffix, literal_id', [
+    ('6.62607015e-34', 'q_J', 'L6.62607015e-34E'),
+    ('1', 'q_s', 'L1E'),
+    ('42', '_km2', 'L42E'),
+    ('0', '_zero', 'L0E'),
+    ('075', '_oct', 'L075E'),
+    ('0xAF', '_hex', 'L0xAFE'),
+    ('0Xaf', 'q_hex', 'L0XafE'),
+    ('0b101', '_bin', 'L0b101E'),
+    ('0B101', '_bin', 'L0B101E'),
+    ('1.25', '_f', 'L1.25E'),
+    ('.5', '_f', 'L.5E'),
+    ('5.', '_f', 'L5.E'),
+    ('5e+42', '_f', 'L5e+42E'),
+    ('0xA.Bp+2', '_f', 'L0xA.Bp+2E'),
+    ('0x1p-2', '_f', 'L0x1p-2E'),
+    ('1', 'foo', 'L1E'),
+    ('1', 'f_tag', 'L1E'),
+    ('1', 'ULL_tag', 'L1E'),
+    ('1', '_', 'L1E'),
+    ('1', 'Q2_s3', 'L1E'),
+    ('"abc"', '_text', 'LA3_KcE'),
+    ('""', '_text', 'LA0_KcE'),
+    ('"abc\\"cba"', '_text', 'LA8_KcE'),
+    (r'"a\\b"', '_text', 'LA4_KcE'),
+    ("'a'", '_char', 'c97'),
+    (r"'\n'", '_char', 'c10'),
+    (r"'\''", '_char', 'c39'),
+    (r"'\\'", '_char', 'c92'),
+    (r"u8'\x0a'", '_char', 'c10'),
+    (r"u'\u0A42'", '_char', 'Ds2626'),
+    (r"U'\U0001F34C'", '_char', 'Di127820'),
+    ("L'a'", '_char', 'w97'),
+])
+def test_user_defined_literals(literal, suffix, literal_id):
+    expression = literal + suffix
+    expression_ast = parse_expression(expression)
+    ast = strip_expression_wrappers(expression_ast)
+    assert isinstance(ast, cppDomain.ASTUserDefinedLiteral)
+    assert isinstance(ast.literal, cppDomain.ASTLiteral)
+    assert isinstance(ast.suffix, cppDomain.ASTIdentifier)
+    assert str(ast.literal) == literal
+    assert str(ast.suffix) == suffix
+    assert str(ast) == expression
+    assert ast.get_display_string() == expression
+    with pytest.raises(NoOldIdError):
+        ast.get_id(1)
+    for version in range(2, _max_id + 1):
+        assert ast.get_id(version) == 'clli%d%s%sE' % (len(suffix), suffix, literal_id)
+        assert expression_ast.get_id(version) == ast.get_id(version)
+    signode = addnodes.desc_signature('', '')
+    ast.describe_signature(signode, 'markType', None, None)
+    assert signode.astext() == expression
+    assert not list(signode.traverse(addnodes.pending_xref))
+
+
+@pytest.mark.parametrize('expression, expected_id', [
+    ('1_tag', 'clli4_tagL1EE'),
+    ('1_other', 'clli6_otherL1EE'),
+    ('1_tag2', 'clli5_tag2L1EE'),
+    ('-1_tag', 'ngclli4_tagL1EE'),
+    ('(1_tag)', 'clli4_tagL1EE'),
+    ('f(1_tag)', 'cl1fclli4_tagL1EEE'),
+    ('1_tag * 2_tag', 'mlclli4_tagL1EEclli4_tagL2EE'),
+    ('true_tag', '8true_tag'),
+    ('false_tag', '9false_tag'),
+    ('nullptr_tag', '11nullptr_tag'),
+    ('1fUfL', 'L1fUfLE'),
+])
+def test_user_defined_literal_expression_ids(expression, expected_id):
+    ast = parse_expression(expression)
+    assert str(ast) == expression
+    for version in range(2, _max_id + 1):
+        assert ast.get_id(version) == expected_id
+
+
+def test_user_defined_literal_initializer():
+    expression = '6.62607015e-34q_J * 1q_s'
+    expression_ast = parse_expression(expression)
+    ast = strip_expression_wrappers(expression_ast)
+    assert isinstance(ast, cppDomain.ASTBinOpExpr)
+    assert ast.ops == ['*']
+    assert len(ast.exprs) == 2
+    operands = [strip_expression_wrappers(operand) for operand in ast.exprs]
+    assert all(isinstance(operand, cppDomain.ASTUserDefinedLiteral) for operand in operands)
+    assert [str(operand.suffix) for operand in operands] == ['q_J', 'q_s']
+    assert ast.get_id(4) == 'mlclli3q_JL6.62607015e-34EEclli3q_sL1EE'
+    declaration = 'constexpr auto units::si::planck_constant = ' + expression
+    member = parse('member', declaration)
+    assert str(member) == declaration
+    assert member.declaration.init.value == expression_ast
+
+    check('class', 'template<> C<1_tag>',
+          {2: 'IE1CIX1_tagEE', 3: 'IE1CIXclli4_tagL1EEEE'})
+    for initializer in ['1_tag', '{1_tag, 2_tag}']:
+        check('member', 'T v = ' + initializer, {1: 'v__T', 2: '1v'})
+        check('function', 'void f(T v = ' + initializer + ')', {1: 'f__T', 2: '1f1T'})
+        check('function', 'template<T v = ' + initializer + '> void f()',
+              {2: 'I_1TE1fv', 4: 'I_1TE1fvv'})
+    check('member', 'T v{1_tag, 2_tag}', {1: 'v__T', 2: '1v'})
+
+
+@pytest.mark.parametrize('expression', [
+    '1 _tag', '1_tag extra', '1_tag another_suffix', '1_tag.5',
+    '"abc" _tag', "'a' _tag", '"abc"_tag extra', "'a'_tag extra",
+    '"unterminated_tag', "'a_tag", '"abc\\"_tag', "''_tag",
+])
+def test_user_defined_literal_invalid(expression):
+    with pytest.raises(DefinitionError):
+        parse_expression(expression)
+
+
 def test_initializers():
     idsMember = {1: 'v__T', 2: '1v'}
     idsFunction = {1: 'f__T', 2: '1f1T'}
@@ -886,6 +1018,25 @@ def filter_warnings(warning, file):
     for w in res:
         print(w)
     return res
+
+
+@pytest.mark.sphinx(testroot='domain-cpp', confoverrides={'nitpicky': True})
+def test_build_domain_cpp_user_defined_literals(app, status, warning):
+    app.builder.build_all()
+    assert filter_warnings(warning, 'user-defined-literals') == []
+    objects = list(app.env.get_domain('cpp').get_objects())
+    assert any(name == 'units::si::planck_constant' and objtype == 'member'
+               and docname == 'user-defined-literals'
+               for name, dispname, objtype, docname, anchor, priority in objects)
+    doctree = app.env.get_doctree('user-defined-literals')
+    expression = '6.62607015e-34q_J * 1q_s'
+    assert doctree.astext().count(expression) == 3
+    assert not list(doctree.traverse(addnodes.pending_xref))
+    html = (app.outdir / 'user-defined-literals.html').read_text()
+    html = unescape(re.sub('<[^>]+>', '', html))
+    assert html.count(expression) == 3
+    assert '"text"_text' in html
+    assert '\u2018a\u2019_char' in html
 
 
 @pytest.mark.sphinx(testroot='domain-cpp', confoverrides={'nitpicky': True})
