@@ -53,6 +53,8 @@ Features added
 Bugs fixed
 ----------
 
+* #49: autodoc: Include source documentation for inherited class and instance
+  attributes, including attributes defined in other modules
 * #7613: autodoc: autodoc does not respect __signature__ of the class
 * #4606: autodoc: the location of the warning is incorrect for inherited method
 * #8105: autodoc: the signature of class constructor is incorrect if the class

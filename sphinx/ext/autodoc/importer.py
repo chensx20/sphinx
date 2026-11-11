@@ -11,10 +11,10 @@
 import importlib
 import traceback
 import warnings
-from typing import Any, Callable, Dict, List, Mapping, NamedTuple, Optional, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Mapping, NamedTuple, Optional, Tuple
 
 from sphinx.deprecation import RemovedInSphinx40Warning, deprecated_alias
-from sphinx.pycode import ModuleAnalyzer
+from sphinx.pycode import ModuleAnalyzer, PycodeError
 from sphinx.util import logging
 from sphinx.util.inspect import (getannotations, getmro, getslots, isclass, isenumclass,
                                  safe_getattr)
@@ -241,6 +241,18 @@ def get_object_members(subject: Any, objpath: List[str], attrgetter: Callable,
     return members
 
 
+def get_class_analyzers(subject: Any) -> Iterator[Tuple[Any, ModuleAnalyzer]]:
+    """Yield source analyzers for classes in method resolution order."""
+    for cls in getmro(subject):
+        try:
+            analyzer = ModuleAnalyzer.for_module(safe_getattr(cls, '__module__'))
+            analyzer.analyze()
+        except (AttributeError, PycodeError):
+            # Builtin and extension classes may not have Python source.
+            continue
+        yield cls, analyzer
+
+
 class ClassAttribute:
     """The attribute of the class."""
 
@@ -300,7 +312,7 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable,
     # annotation only member (ex. attr: int)
     for cls in getmro(subject):
         try:
-            for name in getannotations(cls):
+            for name in cls.__dict__.get('__annotations__', {}):
                 name = unmangle(cls, name)
                 if name and name not in members:
                     members[name] = ClassAttribute(cls, name, INSTANCEATTR)
@@ -308,11 +320,18 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable,
             pass
 
     if analyzer:
-        # append instance attributes (cf. self.attr1) if analyzer knows
         namespace = '.'.join(objpath)
         for (ns, name), docstring in analyzer.attr_docs.items():
             if namespace == ns and name not in members:
                 members[name] = ClassAttribute(subject, name, INSTANCEATTR,
+                                               '\n'.join(docstring))
+
+    # Append source-only attributes from each class, preserving MRO precedence.
+    for cls, analyzer in get_class_analyzers(subject):
+        namespace = cls.__qualname__
+        for (ns, name), docstring in analyzer.attr_docs.items():
+            if namespace == ns and name not in members:
+                members[name] = ClassAttribute(cls, name, INSTANCEATTR,
                                                '\n'.join(docstring))
 
     return members
