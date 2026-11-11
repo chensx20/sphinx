@@ -11,6 +11,50 @@ from sphinx.environment.adapters.toctree import TocTree
 from sphinx.testing.util import assert_node
 
 
+@pytest.mark.sphinx(testroot='toctree-special', srcdir='special-environment')
+def test_special_entries_are_leaves(app, warning):
+    app.build()
+    assert warning.getvalue() == ''
+    env = app.env
+    tree = env.get_doctree('nested/child')
+    parsed = next(tree.findall(addnodes.toctree))
+    assert parsed['entries'] == [
+        ('Custom index', 'genindex'), ('Custom modules', 'modindex'),
+        ('Custom search', 'search'), (None, 'search'),
+    ]
+    assert parsed['includefiles'] == []
+    resolved = TocTree(env).resolve('nested/child', app.builder, parsed)
+    assert len(resolved[0]) == 4
+    for item in resolved[0]:
+        assert_node(item, [list_item, compact_paragraph, reference])
+        assert item[0][0]['internal'] is True
+        assert item[0][0]['anchorname'] == ''
+    for special in ('genindex', 'modindex', 'search', 'py-modindex'):
+        for mapping in (env.found_docs, env.tocs, env.titles, env.toctree_includes,
+                        env.files_to_rebuild, env.collect_relations(),
+                        env.toc_secnumbers, env.toc_fignumbers, env.dependencies):
+            assert special not in mapping
+
+
+@pytest.mark.sphinx(testroot='toctree-special', srcdir='special-glob')
+def test_special_names_are_not_glob_documents(app, warning):
+    source = app.srcdir / 'index.rst'
+    source.write_text(source.read_text(encoding='utf8') + '''
+
+.. toctree::
+   :glob:
+
+   gen*
+   search
+''', encoding='utf8')
+    app.build()
+    assert "toctree glob pattern 'gen*' didn't match any documents" in warning.getvalue()
+    assert warning.getvalue().count('WARNING:') == 1
+    parsed = list(app.env.get_doctree('index').findall(addnodes.toctree))[1]
+    assert parsed['entries'] == [(None, 'search')]
+    assert parsed['includefiles'] == []
+
+
 @pytest.mark.sphinx('xml', testroot='toctree')
 @pytest.mark.test_params(shared_result='test_environment_toctree_basic')
 def test_process_doc(app):

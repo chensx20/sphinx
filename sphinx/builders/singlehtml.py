@@ -27,6 +27,9 @@ class SingleFileHTMLBuilder(StandaloneHTMLBuilder):
 
     copysource = False
 
+    def _get_toctree_special_entry(self, name: str) -> Optional[Tuple[str, str]]:
+        return None
+
     def get_outdated_docs(self) -> Union[str, List[str]]:  # type: ignore[override]
         return 'all documents'
 

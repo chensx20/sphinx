@@ -166,6 +166,10 @@ class Builder:
         return relative_uri(self.get_target_uri(from_),
                             self.get_target_uri(to, typ))
 
+    def _get_toctree_special_entry(self, name: str) -> Optional[Tuple[str, str]]:
+        """Return the generated page and title, if this builder produces it."""
+        return None
+
     def get_outdated_docs(self) -> Union[str, Iterable[str]]:
         """Return an iterable of output files that are outdated, or a string
         describing what an update build will build.

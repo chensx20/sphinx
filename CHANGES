@@ -25,6 +25,8 @@ Features added
 Bugs fixed
 ----------
 
+* #85: Accept generated index, module index and search pages in toctrees,
+  linking only to pages available in the selected builder.
 * #10257: C++, ensure consistent non-specialization template argument
   representation.
 * #10729: C++, fix parsing of certain non-type template parameter packs.
