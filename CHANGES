@@ -47,6 +47,7 @@ Features added
 Bugs fixed
 ----------
 
+* #8638: py domain: Variable field names incorrectly link to unrelated objects
 * #8380: html search: Paragraphs in search results are not identified as ``<p>``
 * #8342: Emit a warning if a unknown domain is given for directive or role (ex.
   ``:unknown:doc:``)
