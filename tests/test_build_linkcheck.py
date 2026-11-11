@@ -274,6 +274,69 @@ def test_follows_redirects_on_GET(app, capsys):
     )
 
 
+@pytest.mark.sphinx(
+    'linkcheck', testroot='linkcheck-localserver', freshenv=True,
+    confoverrides={'linkcheck_workers': 1, 'linkcheck_retries': 1,
+                   'linkcheck_timeout': 5})
+@pytest.mark.parametrize('get_status, status, statuscode, info', [
+    (200, 'working', 0, ''),
+    (500, 'broken', 1,
+     '500 Server Error: Internal Server Error for url: http://localhost:7777/'),
+    (401, 'working', 0, ' - unauthorized'),
+    (503, 'ignored', 0,
+     '503 Server Error: Service Unavailable for url: http://localhost:7777/'),
+    (302, 'broken', 1, None),
+])
+def test_HEAD_redirect_loop(app, monkeypatch, get_status, status, statuscode, info):
+    methods = []
+
+    class RedirectLoopHandler(http.server.BaseHTTPRequestHandler):
+        def do_HEAD(self):
+            methods.append('HEAD')
+            self.send_response(302)
+            self.send_header('Location', '/')
+            self.end_headers()
+
+        def do_GET(self):
+            methods.append('GET')
+            self.send_response(get_status)
+            if get_status == 302:
+                self.send_header('Location', '/')
+            self.end_headers()
+
+    monkeypatch.setenv('NO_PROXY', 'localhost,127.0.0.1')
+    monkeypatch.setenv('no_proxy', 'localhost,127.0.0.1')
+    with http_server(RedirectLoopHandler):
+        app.builder.build_all()
+
+    content = json.loads((app.outdir / 'output.json').read_text())
+    if get_status == 302:
+        info = content['info']
+        assert info
+    assert content == {
+        'filename': 'index.rst',
+        'lineno': 1,
+        'uri': 'http://localhost:7777/',
+        'code': 0,
+        'status': status,
+        'info': info,
+    }
+    assert app.statuscode == statuscode
+    if status == 'broken':
+        assert (app.outdir / 'output.txt').read_text() == (
+            'index.rst:1: [broken] http://localhost:7777/: %s\n' % info
+        )
+    else:
+        assert (app.outdir / 'output.txt').read_text() == ''
+
+    first_get = methods.index('GET')
+    assert first_get > 0
+    assert methods[:first_get] == ['HEAD'] * first_get
+    assert methods[first_get:] == ['GET'] * (len(methods) - first_get)
+    if get_status != 302:
+        assert methods[first_get:] == ['GET']
+
+
 class OKHandler(http.server.BaseHTTPRequestHandler):
     def do_HEAD(self):
         self.send_response(200, "OK")
