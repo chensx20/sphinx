@@ -8,7 +8,33 @@ from subprocess import PIPE, CalledProcessError
 
 import pytest
 
+from sphinx.builders.gettext import Catalog, MsgOrigin
 from sphinx.util.osutil import cd
+
+
+def test_catalog_locations():
+    catalog = Catalog()
+    assert list(catalog) == []
+
+    origins = [MsgOrigin('z.rst', 0), MsgOrigin('a.rst', 12),
+               MsgOrigin('z.rst', 0), MsgOrigin('z.rst', 4),
+               MsgOrigin('a.rst', 0)]
+    origins.append(origins[0])
+    for origin in origins:
+        catalog.add('Type', origin)
+    catalog.add('Another message', origins[0])
+    metadata = {text: list(occurrences) for text, occurrences in catalog.metadata.items()}
+
+    for _ in range(2):
+        messages = list(catalog)
+        assert [message.text for message in messages] == ['Type', 'Another message']
+        assert messages[0].locations == [('z.rst', 0), ('a.rst', 12),
+                                         ('z.rst', 4), ('a.rst', 0)]
+        assert messages[0].uuids == [origin.uid for origin in origins]
+        assert messages[1].locations == [('z.rst', 0)]
+        assert messages[1].uuids == [origins[0].uid]
+        assert catalog.metadata == metadata
+        assert catalog.messages == ['Type', 'Another message']
 
 
 @pytest.mark.sphinx('gettext', srcdir='root-gettext')
@@ -166,6 +192,38 @@ def test_gettext_template_msgid_order_in_sphinxpot(app):
          'msgid "This is Template 2\\.".*'),
         result,
         flags=re.S)
+
+
+@pytest.mark.parametrize('gettext_location', [True, False])
+@pytest.mark.parametrize('gettext_uuid', [True, False])
+@pytest.mark.sphinx('gettext', testroot='gettext-template')
+def test_gettext_template_duplicate_locations(
+        app_params, make_app, gettext_location, gettext_uuid):
+    args, kwargs = app_params
+    kwargs['confoverrides'] = {'gettext_location': gettext_location,
+                               'gettext_uuid': gettext_uuid}
+    template = kwargs['srcdir'] / '_templates' / 'template1.html'
+    template.write_text("{{ _('Type') }} {{ _('Type') }}\n{{ _('Type') }}\n",
+                        encoding='utf8')
+    app = make_app(*args, **kwargs)
+    app.builder.build_all()
+
+    pot = (app.outdir / 'sphinx.pot').read_text(encoding='utf8')
+    assert pot.count('msgid "Type"') == 1
+    entry = next(entry for entry in pot.split('\n\n') if 'msgid "Type"' in entry)
+    references = [line for line in entry.splitlines() if line.startswith('#: ')]
+    occurrences = app.builder.catalogs['sphinx'].metadata['Type']
+    assert [(source, line) for source, line, uid in occurrences] == [
+        (str(template), 1), (str(template), 1), (str(template), 2)]
+    uuids = [uid for source, line, uid in occurrences]
+    assert len(set(uuids)) == 3
+    expected = []
+    if gettext_location:
+        expected.extend(['#: ../../_templates/template1.html:1',
+                         '#: ../../_templates/template1.html:2'])
+    if gettext_uuid:
+        expected.extend('#: ' + uid for uid in uuids)
+    assert references == expected
 
 
 @pytest.mark.sphinx(

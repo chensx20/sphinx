@@ -16,6 +16,7 @@ Features added
 Bugs fixed
 ----------
 
+* #10466: gettext: Remove duplicate source locations from message catalogs
 * #9575: autodoc: The annotation of return value should not be shown when
   ``autodoc_typehints="description"``
 * #9648: autodoc: ``*args`` and ``**kwargs`` entries are duplicated when
