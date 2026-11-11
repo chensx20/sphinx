@@ -791,6 +791,67 @@ def test_canonical(app):
     assert domain.objects['_io.StringIO'] == ('index', 'io.StringIO', 'class', True)
 
 
+@pytest.mark.parametrize('alias', ['var', 'ivar', 'cvar'])
+@pytest.mark.parametrize('names', [('value',), ('value', 'other.Owner.value')])
+def test_variable_field_labels(app, alias, names):
+    text = (".. py:module:: example.subpackage\n"
+            ".. py:class:: Class\n\n")
+    for name in names:
+        text += ("   :%s Value %s: See :py:attr:`other.Owner.value`.\n" % (alias, name))
+    doctree = restructuredtext.parse(app, text)
+    field = list(doctree.traverse(nodes.field))[0]
+    assert field[0].astext() == 'Variables'
+    body = field[1][0]
+    if len(names) == 1:
+        assert isinstance(body, nodes.paragraph)
+        paragraphs = [body]
+    else:
+        assert isinstance(body, nodes.bullet_list)
+        paragraphs = [item[0] for item in body]
+    assert len(paragraphs) == len(names)
+    for paragraph, name in zip(paragraphs, names):
+        assert_node(paragraph[0], [addnodes.literal_strong, name])
+        refs = list(paragraph.traverse(pending_xref))
+        assert [ref['reftarget'] for ref in refs] == ['Value', 'other.Owner.value']
+        assert [ref['reftype'] for ref in refs] == ['class', 'attr']
+        for ref in refs:
+            assert ref['py:module'] == 'example.subpackage'
+            assert ref['py:class'] == 'Class'
+
+
+@pytest.mark.sphinx('html', testroot='domain-py-variable')
+def test_variable_field_html(app, warning):
+    app.builder.build_all()
+    assert warning.getvalue() == ''
+
+    doctree = app.env.get_and_resolve_doctree('index', app.builder)
+    fields = list(doctree.traverse(nodes.field))
+    assert len(fields) == 2
+    for field in fields:
+        labels = list(field.traverse(addnodes.literal_strong))
+        assert [label.astext() for label in labels] == [
+            'value', 'other.subpackage.Owner.value', 'remote.value']
+        for label in labels:
+            assert isinstance(label.parent, nodes.paragraph)
+        refs = list(field.traverse(nodes.reference))
+        assert [ref.get('refid') or ref.get('refuri') for ref in refs] == [
+            'example.subpackage.Value', 'other.subpackage.value',
+            'example.subpackage.Value', 'other.subpackage.Owner.value',
+            'https://example.invalid/api/remote.html#remote.value']
+
+    content = (app.outdir / 'index.html').read_text()
+    assert content.count('<strong>value</strong>') == 2
+    assert content.count('<strong>other.subpackage.Owner.value</strong>') == 2
+    assert content.count('<strong>remote.value</strong>') == 2
+    assert 'href="#example.subpackage.Manual"' in content
+    assert 'href="#variable_fields.Documented"' in content
+    objects = app.env.get_domain('py').objects
+    assert objects['other.subpackage.value'].objtype == 'data'
+    assert objects['other.subpackage.Owner.value'].objtype == 'attribute'
+    assert objects['variable_fields.Documented'].objtype == 'class'
+    assert 'example.subpackage.Manual.value' not in objects
+
+
 def test_info_field_list(app):
     text = (".. py:module:: example\n"
             ".. py:class:: Class\n"
