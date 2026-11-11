@@ -16,6 +16,7 @@ Deprecated
 Features added
 --------------
 
+* #7985: linkcheck: Check local hyperlink targets in the source filesystem.
 * #2076: autodoc: Allow overriding of exclude-members in skip-member function
 * #7849: html: Add :confval:`html_codeblock_linenos_style` to change the style
   of line numbers for code-blocks
