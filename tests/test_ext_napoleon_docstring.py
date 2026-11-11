@@ -17,15 +17,18 @@ from textwrap import dedent
 from unittest import TestCase, mock
 
 import pytest
+from docutils import nodes
 
+from sphinx import addnodes
 from sphinx.ext.napoleon import Config
-from sphinx.ext.napoleon.docstring import GoogleDocstring, NumpyDocstring
 from sphinx.ext.napoleon.docstring import (
     _tokenize_type_spec,
     _recombine_set_tokens,
     _convert_numpy_type_spec,
     _token_type
 )
+from sphinx.ext.napoleon.docstring import GoogleDocstring, NumpyDocstring
+from sphinx.testing import restructuredtext
 
 
 class NamedtupleSubclass(namedtuple('NamedtupleSubclass', ('attr1', 'attr2'))):
@@ -1072,7 +1075,7 @@ Methods:
 .. method:: func(i, j)
    :noindex:
 
-   
+\x20\x20\x20
    description
 """
         config = Config()
@@ -1230,8 +1233,9 @@ class NumpyDocstringTest(BaseDocstringTest):
         """
         Single line summary
 
-        :Parameters: * **arg1** (*str*) -- Extended description of arg1
-                     * **\\*args, \\*\\*kwargs** -- Variable length argument list and arbitrary keyword arguments.
+        :Parameters: * **arg1** (:class:`str`) -- Extended description of arg1
+                     * **\\*args, \\*\\*kwargs** -- Variable length argument list \
+and arbitrary keyword arguments.
         """
     ), (
         """
@@ -2071,7 +2075,7 @@ definition_after_normal_text : int
             ["{", "'F'", ", ", "'C'", ", ", "'N or C'", "}", ", ", "default", " ", "'F'"],
             ["str", ", ", "default", ": ", "'F or C'"],
             ["int", ", ", "default", ": ", "None"],
-            ["int", ", " , "default", " ", "None"],
+            ["int", ", ", "default", " ", "None"],
             ["int", ", ", "default", " ", ":obj:`None`"],
             ['"ma{icious"'],
             [r"'with \'quotes\''"],
@@ -2216,6 +2220,98 @@ def warns(warning, match):
 
 
 class TestNumpyDocstring:
+    @pytest.mark.parametrize('use_param', [True, False])
+    @pytest.mark.parametrize('optional', ['', ', optional'])
+    def test_grouped_parameters(self, use_param, optional):
+        docstring = 'Parameters\n----------\nx1, x2 : array_like%s\n    Shared description.'
+        config = Config(napoleon_use_param=use_param)
+        actual = str(NumpyDocstring(docstring % optional, config))
+        type_spec = ':class:`array_like`' + (', *optional*' if optional else '')
+        if use_param:
+            expected = (':param x1: Shared description.\n:type x1: %s\n'
+                        ':param x2: Shared description.\n:type x2: %s\n') % (
+                            type_spec, type_spec)
+        else:
+            expected = ':Parameters: **x1, x2** (%s) -- Shared description.\n' % type_spec
+        assert actual == expected
+
+    @pytest.mark.parametrize(('declaration', 'names'), [
+        ('x1 ,x2,  x3 ', ['x1', 'x2', 'x3']),
+        ('*args,**kwargs', [r'\*args', r'\*\*kwargs']),
+        ('x_, y_', [r'x\_', r'y\_']),
+        ('single_', [r'single\_']),
+    ])
+    def test_grouped_parameter_names(self, declaration, names):
+        docstring = ('Parameters\n----------\n%s : int\n    Shared.\n'
+                     'following : str\n    Next.') % declaration
+        config = Config(napoleon_use_param=True, strip_signature_backslash=True)
+        expected = ''.join(':param %s: Shared.\n:type %s: :class:`int`\n' % (name, name)
+                           for name in names)
+        expected += ':param following: Next.\n:type following: :class:`str`\n'
+        assert str(NumpyDocstring(docstring, config)) == expected
+
+    @pytest.mark.parametrize(('type_spec', 'expected_type'), [
+        ('', ''),
+        (' : int', ':class:`int`'),
+        (' : {"F", "C"}, optional', '``{"F", "C"}``, *optional*'),
+        (' : DataFrame, optional', ':class:`pandas.DataFrame`, *optional*'),
+    ])
+    @pytest.mark.parametrize('description', [
+        '',
+        '    First line.\n    Second line.',
+        '    - First item\n    - Second item',
+        '    Example::\n\n        print("shared")',
+    ])
+    def test_grouped_parameter_content(self, type_spec, expected_type, description):
+        config = Config(napoleon_use_param=True,
+                        napoleon_type_aliases={'DataFrame': 'pandas.DataFrame'})
+        prefix = 'Parameters\n----------\n'
+        actual = str(NumpyDocstring(prefix + 'x1, x2' + type_spec + '\n' + description,
+                                    config))
+        separate = ('x1' + type_spec + '\n' + description + '\n'
+                    'x2' + type_spec + '\n' + description)
+        assert actual == str(NumpyDocstring(prefix + separate, config))
+        assert actual.count(':param ') == 2
+        if expected_type:
+            assert actual.count(expected_type) == 2
+        else:
+            assert ':type ' not in actual
+
+    @pytest.mark.parametrize(('section', 'expected'), [
+        ('Other Parameters', ':Other Parameters: **x1, x2** (:class:`int`) -- Shared.\n'),
+        ('Attributes', '.. attribute:: x1, x2\n\n   Shared.\n\n   :type: :class:`int`\n'),
+        ('Returns', ':returns: **x1, x2** -- Shared.\n:rtype: :class:`int`\n'),
+        ('Keyword Arguments', ':keyword x1, x2: Shared.\n:kwtype x1, x2: :class:`int`\n'),
+    ])
+    def test_grouped_names_outside_parameters(self, section, expected):
+        docstring = '%s\n%s\nx1, x2 : int\n    Shared.' % (section, '-' * len(section))
+        assert str(NumpyDocstring(docstring, Config(napoleon_use_param=True))) == expected
+
+    def test_google_grouped_parameters_unchanged(self):
+        docstring = 'Args:\n    x1, x2 (int): Shared.'
+        assert str(GoogleDocstring(docstring)) == (
+            ':param x1, x2: Shared.\n:type x1, x2: int\n')
+
+    @pytest.mark.parametrize('optional', ['', ', optional'])
+    @pytest.mark.sphinx('dummy')
+    def test_grouped_parameters_doctree(self, app, optional):
+        docstring = 'Parameters\n----------\nx1, x2 : array_like%s\n    Shared description.'
+        converted = str(NumpyDocstring(docstring % optional))
+        rst = '.. default-domain:: py\n\n.. py:function:: example(x1, x2)\n\n' + '\n'.join(
+            '   ' + line for line in converted.splitlines())
+        doctree = restructuredtext.parse(app, rst)
+        parameters = doctree.traverse(nodes.list_item)
+        assert len(parameters) == 2
+        for parameter, name in zip(parameters, ['x1', 'x2']):
+            names = [node.astext() for node in parameter.traverse(addnodes.literal_strong)]
+            assert names == [name]
+            assert [node.astext() for node in parameter.traverse(nodes.literal)] == [
+                'array_like']
+            assert [node.astext() for node in parameter.traverse(nodes.emphasis)] == (
+                ['optional'] if optional else [])
+            assert parameter.astext().endswith('Shared description.')
+        assert not doctree.traverse(nodes.system_message)
+
     def test_token_type_invalid(self, warning):
         tokens = (
             "{1, 2",
