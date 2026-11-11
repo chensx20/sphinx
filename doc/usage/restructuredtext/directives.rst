@@ -233,6 +233,25 @@ The special document names (and pages generated for them) are:
   These are used for the general index, the Python module index, and the search
   page, respectively.
 
+  These names can be used in a :rst:dir:`toctree`::
+
+     .. toctree::
+
+        genindex
+        modindex
+        Find documents <search>
+
+  Without an explicit title, their titles are ``Index``, ``Module Index``, and
+  ``Search Page`` (translated into the documentation language).  ``modindex``
+  links to the generated Python module index, ``py-modindex``.  These exact
+  names refer to global generated pages even in a nested source directory;
+  paths and names with source suffixes are ordinary document references.
+
+  Entries are omitted when the builder does not generate the page.  For
+  example, a disabled general index or an empty Python module index is omitted,
+  EPUB omits search, and single-page HTML and non-HTML builders omit all three.
+  No source documents should be created for these entries.
+
   The general index is populated with entries from modules, all
   index-generating :ref:`object descriptions <basic-domain-markup>`, and from
   :rst:dir:`index` directives.

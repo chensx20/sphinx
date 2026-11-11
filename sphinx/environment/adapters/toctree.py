@@ -125,6 +125,16 @@ class TocTree:
                         para = addnodes.compact_paragraph('', '', reference)
                         item = nodes.list_item('', para)
                         toc = nodes.bullet_list('', item)
+                    elif ref in ('genindex', 'modindex', 'search'):
+                        special = builder._get_toctree_special_entry(ref)
+                        if special is None:
+                            continue
+                        pagename, default_title = special
+                        reference = nodes.reference('', '', nodes.Text(
+                            title if title is not None else default_title),
+                            internal=True, refuri=pagename, anchorname='')
+                        para = addnodes.compact_paragraph('', '', reference)
+                        toc = nodes.bullet_list('', nodes.list_item('', para))
                     elif ref == 'self':
                         # 'self' refers to the document from which this
                         # toctree originates

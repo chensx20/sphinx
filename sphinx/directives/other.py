@@ -109,6 +109,9 @@ class TocTree(SphinxDirective):
                 else:
                     ref = docname = entry
                     title = None
+                if ref in ('genindex', 'modindex', 'search'):
+                    toctree['entries'].append((title, ref))
+                    continue
                 # remove suffixes (backwards compatibility)
                 for suffix in suffixes:
                     if docname.endswith(suffix):

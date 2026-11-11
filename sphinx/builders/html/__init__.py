@@ -1017,6 +1017,18 @@ class StandaloneHTMLBuilder(Builder):
         ctx['sidebars'] = sidebars
         ctx['customsidebar'] = customsidebar
 
+    def _get_toctree_special_entry(self, name: str) -> Optional[Tuple[str, str]]:
+        if name == 'genindex':
+            return ('genindex', _('Index')) if self.use_index else None
+        elif name == 'modindex':
+            if any(indexname == 'py-modindex'
+                   for indexname, _indexcls, _content, _collapse in self.domain_indices):
+                return 'py-modindex', _('Module Index')
+            return None
+        elif name == 'search':
+            return ('search', _('Search Page')) if self.search else None
+        raise ValueError('Unknown toctree special entry: %s' % name)
+
     # --------- these are overwritten by the serialization builder
 
     def get_target_uri(self, docname: str, typ: str = None) -> str:
