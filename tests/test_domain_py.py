@@ -373,6 +373,24 @@ def test_pyfunction_signature_full_py38(app):
                                       [desc_parameter, desc_sig_operator, "/"])])
 
 
+@pytest.mark.skipif(sys.version_info < (3, 8), reason='python 3.8+ is required.')
+@pytest.mark.parametrize('signature', ['foo(a, b=0, /, c=1)', 'foo(a, b=0, /)'])
+def test_pyfunction_signature_positional_only_defaults(app, signature):
+    doctree = restructuredtext.parse(app, '.. py:function:: ' + signature)
+    parameters = [
+        [desc_parameter, desc_sig_name, 'a'],
+        [desc_parameter, ([desc_sig_name, 'b'],
+                          [desc_sig_operator, '='],
+                          [nodes.inline, '0'])],
+        [desc_parameter, desc_sig_operator, '/'],
+    ]
+    if signature == 'foo(a, b=0, /, c=1)':
+        parameters.append([desc_parameter, ([desc_sig_name, 'c'],
+                                            [desc_sig_operator, '='],
+                                            [nodes.inline, '1'])])
+    assert_node(doctree[1][0][1], [desc_parameterlist, tuple(parameters)])
+
+
 def test_optional_pyfunction_signature(app):
     text = ".. py:function:: compile(source [, filename [, symbol]]) -> ast object"
     doctree = restructuredtext.parse(app, text)
@@ -794,5 +812,4 @@ def test_modindex_common_prefix(app):
                 IndexEntry('sphinx_intl', 0, 'index', 'module-sphinx_intl', '', '', '')])],
         True
     )
-
 
