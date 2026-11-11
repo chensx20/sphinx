@@ -47,6 +47,8 @@ Features added
 Bugs fixed
 ----------
 
+* #8721: viewcode: Do not generate module pages for EPUB with
+  :confval:`viewcode_enable_epub` disabled when reusing the HTML doctree cache
 * #741: autodoc: inherited-members doesn't work for instance attributes on super
   class
 * #8592: autodoc: ``:meta public:`` does not effect to variables

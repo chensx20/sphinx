@@ -9,8 +9,59 @@
 """
 
 import re
+from xml.etree import ElementTree
+from zipfile import ZipFile
 
 import pytest
+
+
+@pytest.mark.parametrize('confoverrides', [
+    {}, {'viewcode_enable_epub': False}, {'viewcode_enable_epub': True},
+], ids=['default', 'disabled', 'enabled'])
+@pytest.mark.parametrize('shared_cache', [True, False], ids=['cached', 'fresh'])
+def test_viewcode_epub(make_app, rootdir, tempdir, confoverrides, shared_cache):
+    srcdir = tempdir / 'viewcode'
+    (rootdir / 'test-ext-viewcode').copytree(srcdir)
+
+    if shared_cache:
+        html = make_app('html', srcdir=srcdir, confoverrides=confoverrides)
+        html.build()
+        for page in ('index', 'spam/mod1', 'spam/mod2'):
+            assert (html.outdir / '_modules' / (page + '.html')).exists()
+        assert html.env._viewcode_modules
+        assert (html.doctreedir / 'environment.pickle').exists()
+
+    epub = make_app('epub', srcdir=srcdir, confoverrides=confoverrides)
+    if shared_cache:
+        assert epub.doctreedir == html.doctreedir
+        assert epub.outdir != html.outdir
+        assert epub.env is not html.env
+        assert epub.env._viewcode_modules == html.env._viewcode_modules
+        assert epub.env._viewcode_modules
+
+    reread = []
+    epub.connect('doctree-read', lambda app, doctree: reread.append(doctree))
+    epub.build()
+    if shared_cache:
+        assert reread == []
+        assert epub.env._viewcode_modules == html.env._viewcode_modules
+
+    opf = ElementTree.fromstring((epub.outdir / 'content.opf').read_text())
+    manifest = {item.attrib['href'] for item in opf.findall(
+        './/{http://www.idpf.org/2007/opf}item')}
+    with ZipFile(epub.outdir / (epub.config.epub_basename + '.epub')) as archive:
+        packaged = set(archive.namelist())
+
+    if epub.config.viewcode_enable_epub:
+        for page in ('index', 'spam/mod1', 'spam/mod2'):
+            filename = '_modules/' + page + '.xhtml'
+            assert (epub.outdir / filename).exists()
+            assert filename in manifest
+            assert filename in packaged
+    else:
+        assert not (epub.outdir / '_modules').exists()
+        assert not any(filename.startswith('_modules/') for filename in manifest)
+        assert not any(filename.startswith('_modules/') for filename in packaged)
 
 
 @pytest.mark.sphinx(testroot='ext-viewcode')
