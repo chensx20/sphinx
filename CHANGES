@@ -60,6 +60,8 @@ Features added
 Bugs fixed
 ----------
 
+* #8056: napoleon: Split grouped NumPy parameters into individual parameter
+  fields, preserving their shared type, optionality and description.
 * #7886: autodoc: TypeError is raised on mocking generic-typed classes
 * #7935: autodoc: function signature is not shown when the function has a
   parameter having ``inspect._empty`` as its default value

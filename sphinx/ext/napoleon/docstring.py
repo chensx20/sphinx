@@ -1087,15 +1087,16 @@ class NumpyDocstring(GoogleDocstring):
         else:
             return func(name)
 
-    def _consume_field(self, parse_type: bool = True, prefer_type: bool = False
-                       ) -> Tuple[str, str, List[str]]:
+    def _consume_field(self, parse_type: bool = True, prefer_type: bool = False,
+                       escape_name: bool = True) -> Tuple[str, str, List[str]]:
         line = next(self._line_iter)
         if parse_type:
             _name, _, _type = self._partition_field_on_colon(line)
         else:
             _name, _type = line, ''
         _name, _type = _name.strip(), _type.strip()
-        _name = self._escape_args_and_kwargs(_name)
+        if escape_name:
+            _name = self._escape_args_and_kwargs(_name)
         _type = _convert_numpy_type_spec(
             _type,
             location=self._get_location(),
@@ -1111,6 +1112,20 @@ class NumpyDocstring(GoogleDocstring):
 
     def _consume_returns_section(self) -> List[Tuple[str, str, List[str]]]:
         return self._consume_fields(prefer_type=True)
+
+    def _parse_parameters_section(self, section: str) -> List[str]:
+        if not self._config.napoleon_use_param:
+            return super()._parse_parameters_section(section)
+
+        self._consume_empty()
+        fields = []
+        while not self._is_section_break():
+            _name, _type, _desc = self._consume_field(escape_name=False)
+            if _name or _type or _desc:
+                for name in _name.split(','):
+                    name = self._escape_args_and_kwargs(name.strip())
+                    fields.append((name, _type, _desc))
+        return self._format_docutils_params(fields)
 
     def _consume_section_header(self) -> str:
         section = next(self._line_iter)
