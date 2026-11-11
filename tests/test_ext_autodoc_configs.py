@@ -9,13 +9,209 @@
 """
 
 import platform
-import sys
 
 import pytest
-
-from test_ext_autodoc import do_autodoc
+from test_ext_autodoc import do_autodoc, make_directive_bridge
 
 IS_PYPY = platform.python_implementation() == 'PyPy'
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+@pytest.mark.parametrize('objtype, name, signatures, body, extra', [
+    ('function', 'func', ['(value: int) -> int', '(value: str, count=1) -> str', '()'],
+     ['Function body::', '', "    func('example')", '', ':param value: a value', ''], []),
+    ('method', 'Example.method',
+     ['(self, value: int) -> int', '(self, value: str) -> str', '(self)'],
+     ['Method body::', '', "    method('example')", '', ':param value: a value', ''], []),
+    ('method', 'Example.static', ['(value: int) -> int', '()'], [], ['   :staticmethod:']),
+    ('method', 'Example.classmethod', ['(cls, value: int) -> int', '(cls)'], [],
+     ['   :classmethod:']),
+    ('class', 'Example', ['(value: int)', '(value: str)'], ['Class body.', ''], []),
+    ('class', 'Inherited', ['(value: int)', '(value: str)'], ['Class body.', ''], []),
+    ('property', 'Example.prop', [''], ['Property body.', ''], ['   :property:']),
+    ('attribute', 'Example.attr', [''], ['Attribute body.', ''], []),
+])
+def test_overloaded_docstring_signature(app, objtype, name, signatures, body, extra):
+    directive = 'method' if objtype == 'property' else objtype
+    prefix = '.. py:%s:: ' % directive
+    expected = ['', prefix + name + signatures[0]]
+    expected.extend(' ' * len(prefix) + name + sig for sig in signatures[1:])
+    expected.extend(['   :module: target.overloaded_docstring'] + extra + [''])
+    expected.extend('   ' + line if line else '' for line in body)
+    assert list(do_autodoc(app, objtype, 'target.overloaded_docstring.' + name)) == expected
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+@pytest.mark.parametrize('content, signatures, body', [
+    ('class', ['(value: int)', '(value: str)'], ['Class body.', '']),
+    ('init', ['(self, value: bytes)', '(self)'], ['Constructor body.', '']),
+    ('both', ['(value: int)', '(value: str)'],
+     ['Class body.', '', '__init__(self, value: bytes)', '__init__(self)', '',
+      'Constructor body.', '']),
+])
+def test_overloaded_constructor_docstring(app, content, signatures, body):
+    app.config.autoclass_content = content
+    assert list(do_autodoc(app, 'class', 'target.overloaded_docstring.Example')) == [
+        '', '.. py:class:: Example' + signatures[0],
+        '              Example' + signatures[1],
+        '   :module: target.overloaded_docstring', '',
+    ] + ['   ' + line if line else '' for line in body]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+@pytest.mark.parametrize('boundary', ['', 'Prose.', 'other(value)', 'func(', 'func'])
+def test_overloaded_docstring_boundary(app, boundary):
+    from target.overloaded_docstring import func
+
+    original = func.__doc__
+    func.__doc__ = 'func(first) -> int\nfunc(second)\n' + boundary + '\nfunc(body)'
+    try:
+        assert list(do_autodoc(app, 'function', 'target.overloaded_docstring.func')) == [
+            '', '.. py:function:: func(first) -> int', '                 func(second)',
+            '   :module: target.overloaded_docstring', '',
+        ] + (['   ' + boundary] if boundary else []) + ['   func(body)', '']
+    finally:
+        func.__doc__ = original
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+@pytest.mark.parametrize('explicit, enabled, signature', [
+    ('', False, '(*args)'), ('(override)', True, '(override)'), ('()', True, '()'),
+])
+def test_overloaded_docstring_bypass(app, explicit, enabled, signature):
+    app.config.autodoc_docstring_signature = enabled
+    actual = do_autodoc(app, 'function', 'target.overloaded_docstring.func' + explicit)
+    assert list(actual) == [
+        '', '.. py:function:: func' + signature,
+        '   :module: target.overloaded_docstring', '',
+        '   func(value: int) -> int', '   func(value: str, count=1) -> str', '   func()',
+        '', '   Function body::', '', "       func('example')", '',
+        '   :param value: a value', '',
+    ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_overloaded_docstring_formatting_state(app):
+    from target.overloaded_docstring import func
+
+    calls = []
+
+    def process_signature(app, what, name, obj, options, args, retann):
+        calls.append((args, retann))
+        if args == '(value: str, count=1)':
+            return '(replacement)', 'bytes'
+
+    app.connect('autodoc-process-signature', process_signature)
+    documenter = app.registry.documenters['function'](
+        make_directive_bridge(app.env), 'target.overloaded_docstring.func')
+    assert documenter.parse_name()
+    assert documenter.import_object()
+    original = func.__doc__
+    for _ in range(2):
+        assert documenter.format_signature() == (
+            '(value: int) -> int\n(replacement) -> bytes\n()')
+        assert documenter.get_doc() == [
+            ['Function body::', '', "    func('example')", '', ':param value: a value', '']]
+        assert (documenter.args, documenter.retann) == (None, None)
+        assert func.__doc__ == original
+    assert calls == [('(value: int)', 'int'), ('(value: str, count=1)', 'str'),
+                     ('()', None)] * 2
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_overloaded_docstring_find_signature(app):
+    from sphinx.deprecation import RemovedInSphinx40Warning
+
+    documenter = app.registry.documenters['function'](
+        make_directive_bridge(app.env), 'target.overloaded_docstring.func')
+    assert documenter.parse_name()
+    assert documenter.import_object()
+    with pytest.warns(RemovedInSphinx40Warning, match="'encoding' argument"):
+        assert documenter._find_signature('utf-8') == ('value: int', 'int')
+    assert documenter._find_signature() == ('value: int', 'int')
+    assert documenter.format_signature() == (
+        '(value: int) -> int\n(value: str, count=1) -> str\n()')
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+@pytest.mark.parametrize('docstring, signature, body', [
+    ('func\nfunc\nfunc(body)', '(*args)', ['func', 'func(body)', '']),
+    ('Prose.\nfunc(body)', '(*args)', ['Prose.', 'func(body)', '']),
+    ('other(value)\nfunc(body)', '(*args)', ['other(value)', 'func(body)', '']),
+    ('func(first)\nfunc(second)', '(first)\n(second)', []),
+])
+def test_overloaded_docstring_first_line(app, docstring, signature, body):
+    from target.overloaded_docstring import func
+
+    original = func.__doc__
+    func.__doc__ = docstring
+    try:
+        signatures = signature.splitlines()
+        assert list(do_autodoc(app, 'function', 'target.overloaded_docstring.func')) == [
+            '', '.. py:function:: func' + signatures[0],
+        ] + ['                 func' + sig for sig in signatures[1:]] + [
+            '   :module: target.overloaded_docstring', '',
+        ] + ['   ' + line if line else '' for line in body]
+    finally:
+        func.__doc__ = original
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_overloaded_docstring_class_alias(app):
+    assert list(do_autodoc(app, 'class', 'target.overloaded_docstring.Alias')) == [
+        '', '.. py:attribute:: Alias', '   :module: target.overloaded_docstring', '',
+        '   alias of :class:`target.overloaded_docstring.Example`',
+    ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_overloaded_docstring_singledispatch(app):
+    assert list(do_autodoc(app, 'function', 'target.overloaded_docstring.dispatch')) == [
+        '', '.. py:function:: dispatch(value: str) -> str',
+        '                 dispatch(value: bytes)', '                 dispatch(value: int)',
+        '   :module: target.overloaded_docstring', '', '   Dispatch body.', '',
+    ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+@pytest.mark.parametrize('objtype, name', [
+    ('property', 'Example.prop'), ('attribute', 'Example.attr'),
+])
+def test_overloaded_docstring_strip_state(app, objtype, name):
+    calls = []
+
+    def process_signature(app, what, name, obj, options, args, retann):
+        calls.append((args, retann))
+
+    app.connect('autodoc-process-signature', process_signature)
+    documenter = app.registry.documenters[objtype](
+        make_directive_bridge(app.env), 'target.overloaded_docstring.' + name)
+    assert documenter.parse_name()
+    assert documenter.import_object()
+    for _ in range(2):
+        assert documenter.format_signature() == ''
+        assert documenter.retann == 'int'
+    assert calls == [(None, None), (None, None)]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_overloaded_docstring_tab_width(app):
+    from target.overloaded_docstring import func
+
+    original = func.__doc__
+    func.__doc__ = ('func(first)\nfunc(second)\n\n\tBody::\n\n\t\tliteral\n\n'
+                    '\t:param first: value')
+    try:
+        documenter = app.registry.documenters['function'](
+            make_directive_bridge(app.env), 'target.overloaded_docstring.func')
+        documenter.directive.state.document.settings.tab_width = 4
+        assert documenter.parse_name()
+        assert documenter.import_object()
+        assert documenter.format_signature() == '(first)\n(second)'
+        assert documenter.get_doc() == [
+            ['Body::', '', '    literal', '', ':param first: value', '']]
+    finally:
+        func.__doc__ = original
 
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
@@ -617,7 +813,6 @@ def test_autodoc_typehints_description(app):
             '   Return type:\n'
             '      Tuple[int, int]\n'
             in context)
-
 
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
