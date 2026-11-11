@@ -23,6 +23,7 @@ Other contributors, listed alphabetically, are:
 * Andi Albrecht -- agogo theme
 * Jakob Lykke Andersen -- Rewritten C++ domain
 * Henrique Bastos -- SVG support for graphviz extension
+* Casey Brooks -- C++ user-defined literal support
 * Daniel Bültmann -- todo extension
 * Marco Buttu -- doctest extension (pyversion option)
 * Nathan Damon -- bugfix in validation of static paths in html builders

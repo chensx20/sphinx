@@ -69,6 +69,7 @@ Features added
 Bugs fixed
 ----------
 
+* #7590: C++: Support user-defined literals in expressions and initializers
 * #6703: autodoc: incremental build does not work for imported objects
 * #7564: autodoc: annotations not to be shown for descriptors
 * #6588: autodoc: Decorated inherited method has no documentation

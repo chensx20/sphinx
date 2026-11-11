@@ -331,6 +331,8 @@ _keywords = [
     'while', 'xor', 'xor_eq'
 ]
 
+_udl_suffix_re = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
+
 _max_id = 4
 _id_prefix = [None, '', '_CPPv2', '_CPPv3', '_CPPv4']
 # Ids are used in lookup keys which are used across pickled files,
@@ -787,6 +789,25 @@ class ASTExpression(ASTBase):
 
 class ASTLiteral(ASTExpression):
     pass
+
+
+class ASTUserDefinedLiteral(ASTLiteral):
+    def __init__(self, literal: ASTLiteral, suffix: ASTIdentifier) -> None:
+        self.literal = literal
+        self.suffix = suffix
+
+    def _stringify(self, transform: StringifyTransform) -> str:
+        return transform(self.literal) + transform(self.suffix)
+
+    def get_id(self, version: int) -> str:
+        if version == 1:
+            raise NoOldIdError()
+        return 'clli' + self.suffix.get_id(version) + self.literal.get_id(version) + 'E'
+
+    def describe_signature(self, signode: TextElement, mode: str,
+                           env: "BuildEnvironment", symbol: "Symbol") -> None:
+        self.literal.describe_signature(signode, mode, env, symbol)
+        signode.append(nodes.Text(str(self.suffix)))
 
 
 class ASTPointerLiteral(ASTLiteral):
@@ -4643,6 +4664,11 @@ class DefinitionParser(BaseParser):
             self.pos += 1
         return self.definition[startPos:self.pos]
 
+    def _parse_literal_suffix(self, literal: ASTLiteral) -> ASTLiteral:
+        if self.match(_udl_suffix_re):
+            return ASTUserDefinedLiteral(literal, ASTIdentifier(self.matched_text))
+        return literal
+
     def _parse_literal(self) -> ASTLiteral:
         # -> integer-literal
         #  | character-literal
@@ -4662,27 +4688,31 @@ class DefinitionParser(BaseParser):
                       integer_literal_re, octal_literal_re]:
             pos = self.pos
             if self.match(regex):
-                while self.current_char in 'uUlLfF':
-                    self.pos += 1
-                return ASTNumberLiteral(self.definition[pos:self.pos])
+                # Classify the whole suffix before consuming built-in suffix characters.
+                suffix = _udl_suffix_re.match(self.definition, self.pos)
+                if suffix is not None and all(c in 'uUlLfF' for c in suffix.group()):
+                    self.pos = suffix.end()
+                    return ASTNumberLiteral(self.definition[pos:self.pos])
+                return self._parse_literal_suffix(
+                    ASTNumberLiteral(self.definition[pos:self.pos]))
 
         string = self._parse_string()
         if string is not None:
-            return ASTStringLiteral(string)
+            return self._parse_literal_suffix(ASTStringLiteral(string))
 
         # character-literal
         if self.match(char_literal_re):
             prefix = self.last_match.group(1)  # may be None when no prefix
             data = self.last_match.group(2)
             try:
-                return ASTCharLiteral(prefix, data)
+                literal = ASTCharLiteral(prefix, data)
             except UnicodeDecodeError as e:
                 self.fail("Can not handle character literal. Internal error was: %s" % e)
             except UnsupportedMultiCharacterCharLiteral:
                 self.fail("Can not handle character literal"
                           " resulting in multiple decoded characters.")
+            return self._parse_literal_suffix(literal)
 
-        # TODO: user-defined lit
         return None
 
     def _parse_fold_or_paren_expression(self) -> ASTExpression:
