@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from docutils import nodes
+from docutils import nodes, statemachine
 from docutils.parsers.rst import directives
 from docutils.parsers.rst.directives.admonitions import BaseAdmonition
 from docutils.parsers.rst.directives.misc import Class
@@ -376,7 +377,28 @@ class Include(BaseInclude, SphinxDirective):
         rel_filename, filename = self.env.relfn2path(self.arguments[0])
         self.arguments[0] = filename
         self.env.note_included(filename)
-        return super().run()
+
+        def insert_input(input_lines: list[str] | statemachine.StringList,
+                         source: str) -> None:
+            # Docutils appends a blank line and an end-of-inclusion marker.
+            # Keep these outside the event so listeners cannot alter bookkeeping.
+            original = '\n'.join(input_lines[:-2])
+            content = [original]
+            self.env.events.emit('include-read', Path(rel_filename), self.env.docname, content)
+            if content[0] != original:
+                tab_width = self.options.get('tab-width',
+                                             self.state.document.settings.tab_width)
+                lines = statemachine.string2lines(content[0], tab_width,
+                                                  convert_whitespace=True)
+                input_lines = lines + list(input_lines[-2:])
+            original_insert(input_lines, source)
+
+        original_insert = self.state_machine.insert_input
+        self.state_machine.insert_input = insert_input  # type: ignore[method-assign]
+        try:
+            return super().run()
+        finally:
+            self.state_machine.insert_input = original_insert  # type: ignore[method-assign]
 
 
 def setup(app: Sphinx) -> dict[str, Any]:
