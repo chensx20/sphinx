@@ -196,7 +196,8 @@ def test_gettext_template_msgid_order_in_sphinxpot(app):
 
 @pytest.mark.parametrize('gettext_location', [True, False])
 @pytest.mark.parametrize('gettext_uuid', [True, False])
-@pytest.mark.sphinx('gettext', testroot='gettext-template')
+@pytest.mark.sphinx('gettext', testroot='gettext-template',
+                    srcdir='gettext-template-duplicate-locations')
 def test_gettext_template_duplicate_locations(
         app_params, make_app, gettext_location, gettext_uuid):
     args, kwargs = app_params
