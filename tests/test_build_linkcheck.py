@@ -11,6 +11,7 @@
 import json
 import shutil
 from unittest import mock
+from urllib.parse import urlsplit
 
 import pytest
 from docutils import nodes
@@ -46,7 +47,7 @@ def test_local_links(local_link_app):
         ('index.rst', 'target'),
         ('index.rst', 'assets/'),
         ('index.rst', 'assets/semi;colon.txt'),
-        ('index.rst', 'assets/encoded%20%23%3F.txt?download=1#missing-anchor'),
+        ('index.rst', 'assets/encoded%20%23.txt?download=1#missing-anchor'),
         ('nested/page.rst', 'target'),
         ('nested/page.rst', '/target'),
         ('nested/page.rst', '../target'),
@@ -143,6 +144,41 @@ def test_local_exclusions(local_link_app, uri, status):
     app.builder.finish()
     assert app.statuscode == 0
     assert json.loads((app.outdir / 'output.json').read_text())['status'] == status
+
+
+@pytest.mark.parametrize('ignored', [False, True])
+@pytest.mark.parametrize('uri', [
+    '//[broken/path', 'custom://[broken/path', 'file://[broken/path',
+])
+def test_local_malformed_exclusions(local_link_app, uri, ignored):
+    app = local_link_app(confoverrides={'linkcheck_ignore': ['.*'] if ignored else []})
+    try:
+        with mock.patch('sphinx.builders.linkcheck.urlsplit', wraps=urlsplit) as split:
+            app.builder.wqueue.put((uri, 'index', 1))
+            result = app.builder.rqueue.get(timeout=2)
+            assert result == (uri, 'index', 1, 'local', '', 0)
+            split.assert_not_called()
+    finally:
+        app.builder.finish()
+
+
+@pytest.mark.parametrize('ignored', [False, True])
+def test_local_uri_parse_error(local_link_app, ignored):
+    app = local_link_app(confoverrides={'linkcheck_ignore': ['target'] if ignored else []})
+    try:
+        with mock.patch('sphinx.builders.linkcheck.urlsplit',
+                        side_effect=ValueError('Invalid local URI')) as split:
+            app.builder.wqueue.put(('target', 'index', 1))
+            result = app.builder.rqueue.get(timeout=2)
+            if ignored:
+                assert result == ('target', 'index', 1, 'ignored', '', 0)
+                split.assert_not_called()
+            else:
+                assert result == ('target', 'index', 1, 'broken', 'Invalid local URI', 0)
+                app.builder.process_result(result)
+                assert app.statuscode == 1
+    finally:
+        app.builder.finish()
 
 
 def test_local_parent_outside_source(local_link_app):

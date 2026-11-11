@@ -213,12 +213,15 @@ class CheckExternalLinksBuilder(Builder):
             if len(uri) == 0 or uri.startswith(('#', 'mailto:', 'ftp:')):
                 return 'unchecked', '', 0
             elif not uri.startswith(('http:', 'https:')):
-                parsed = urlsplit(uri)
-                if parsed.scheme or parsed.netloc:
+                if uri.startswith('//') or re.match(r'[a-zA-Z][a-zA-Z0-9+.-]*:', uri):
                     return 'local', '', 0
                 for rex in self.to_ignore:
                     if rex.match(uri):
                         return 'ignored', '', 0
+                try:
+                    parsed = urlsplit(uri)
+                except ValueError as err:
+                    return 'broken', str(err), 0
                 filename = unquote(parsed.path)
                 _, filename = self.env.relfn2path(filename, docname)
                 if path.exists(filename):

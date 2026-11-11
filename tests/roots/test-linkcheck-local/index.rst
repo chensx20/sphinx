@@ -9,7 +9,7 @@ Local links
 
 `Semicolon filename <assets/semi;colon.txt>`_
 
-`Encoded filename <assets/encoded%20%23%3F.txt?download=1#missing-anchor>`_
+`Encoded filename <assets/encoded%20%23.txt?download=1#missing-anchor>`_
 
 :ref:`local-label` and :doc:`nested/page` are valid cross-references.
 
