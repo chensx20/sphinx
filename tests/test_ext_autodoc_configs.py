@@ -322,6 +322,31 @@ def test_autodoc_docstring_signature(app):
 
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_autodoc_docstring_overload_signatures(app):
+    actual = do_autodoc(app, 'function', 'target.docstring_overloads.overloaded')
+    assert list(actual) == [
+        '',
+        '.. py:function:: overloaded(value: int) -> int',
+        '                 overloaded(value: str) -> str',
+        '   :module: target.docstring_overloads',
+        '',
+        '   Shared body.',
+        '',
+    ]
+
+    actual = do_autodoc(app, 'method', 'target.docstring_overloads.Overloaded.method')
+    assert list(actual) == [
+        '',
+        '.. py:method:: Overloaded.method(value: int) -> int',
+        '               Overloaded.method(value: str) -> str',
+        '   :module: target.docstring_overloads',
+        '',
+        '   Method body.',
+        '',
+    ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
 def test_autoclass_content_and_docstring_signature_class(app):
     app.config.autoclass_content = 'class'
     options = {"members": None,
