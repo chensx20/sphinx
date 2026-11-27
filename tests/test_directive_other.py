@@ -135,6 +135,29 @@ def test_reversed_toctree(app):
                 includefiles=['baz', 'bar/index', 'foo'])
 
 
+@pytest.mark.sphinx(testroot='source-read-include', buildername='html')
+def test_source_read_included_rst(app):
+    source_read_docnames = []
+
+    def replace_original(app, docname, source):
+        source_read_docnames.append(docname)
+        source[0] = source[0].replace('ORIGINAL', 'REPLACED')
+
+    app.connect('source-read', replace_original)
+    app.builder.build(['index'])
+
+    output = (app.outdir / 'index.html').read_text(encoding='utf-8')
+    assert 'Included REPLACED.' in output
+    assert 'Nested REPLACED.' in output
+    assert output.count('<span class="n">ORIGINAL</span>') == 2
+    assert 'After the include.' in output
+    assert source_read_docnames.count('index') == 1
+    assert source_read_docnames.count('included') == 1
+    assert source_read_docnames.count('nested') == 1
+    assert 'literal' not in source_read_docnames
+    assert 'code' not in source_read_docnames
+
+
 @pytest.mark.sphinx(testroot='toctree-glob')
 def test_toctree_twice(app):
     text = (".. toctree::\n"
