@@ -300,6 +300,27 @@ def test_expressions():
     exprCheck('a(b(c, 1 + d...)..., e(f..., g))', 'cl1aspcl1b1cspplL1E1dEcl1esp1f1gEE')
 
 
+def test_numeric_user_defined_literals():
+    class Config:
+        cpp_id_attributes = ["id_attr"]
+        cpp_paren_attributes = ["paren_attr"]
+
+    for literal in ('6.62607015e-34_q_J', '1_q_s', '42ULL', '1.0f'):
+        parser = DefinitionParser(literal, location=None, config=Config())
+        parser.allowFallbackExpressionParsing = False
+        ast = parser.parse_expression()
+        assert str(ast) == literal
+
+    parser = DefinitionParser('1 _q_s', location=None, config=Config())
+    parser.allowFallbackExpressionParsing = False
+    with pytest.raises(DefinitionError):
+        parser.parse_expression()
+
+    declaration = 'int planck_constant = ' \
+        '6.62607015e-34_q_J * 1_q_s'
+    assert str(parse('member', declaration)) == declaration
+
+
 def test_type_definitions():
     check("type", "public bool b", {1: "b", 2: "1b"}, "bool b")
     check("type", "bool A::b", {1: "A::b", 2: "N1A1bE"})
