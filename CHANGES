@@ -134,6 +134,8 @@ Features added
 Bugs fixed
 ----------
 
+* #10435: LaTeX: Remove boundary whitespace from highlighted inline code.
+
 Testing
 --------
 

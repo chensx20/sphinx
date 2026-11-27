@@ -1519,7 +1519,7 @@ def test_latex_labels(app, status, warning):
 def test_latex_figure_in_admonition(app, status, warning):
     app.builder.build_all()
     result = (app.outdir / 'python.tex').read_text(encoding='utf8')
-    assert(r'\begin{figure}[H]' in result)
+    assert (r'\begin{figure}[H]' in result)
 
 
 def test_default_latex_documents():
@@ -1623,7 +1623,10 @@ def test_latex_code_role(app):
         r'\PYG{p}{)}'
         r'\PYG{p}{:} '
         r'\PYG{k}{pass}')
+    inline_content = (r'Inline \sphinxcode{\sphinxupquote{%' + '\n' +
+                      common_content + '%' + '\n}}, code block')
+    assert inline_content in content
     assert (r'Inline \sphinxcode{\sphinxupquote{' + '\n' +
-            common_content + '\n}} code block') in content
+            common_content + '\n}}') not in content
     assert (r'\begin{sphinxVerbatim}[commandchars=\\\{\}]' +
             '\n' + common_content + '\n' + r'\end{sphinxVerbatim}') in content
