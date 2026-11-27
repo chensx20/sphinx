@@ -1,8 +1,31 @@
 """Test the LaTeX writer"""
 
-import pytest
+from types import SimpleNamespace
+from unittest.mock import Mock
 
-from sphinx.writers.latex import rstdim_to_latexdim
+import pytest
+from docutils import nodes
+
+from sphinx.writers.latex import LaTeXTranslator, rstdim_to_latexdim
+
+
+def test_highlighted_inline_literal_preserves_horizontal_whitespace():
+    translator = LaTeXTranslator.__new__(LaTeXTranslator)
+    translator.in_title = 0
+    translator.body = []
+    translator.config = SimpleNamespace(highlight_options={})
+    translator.highlighter = Mock()
+    translator.highlighter.highlight_block.return_value = (
+        r'\begin{Verbatim}[commandchars=\\\{\}]' + '\n' + '  token  ' + '\n' +
+        r'\end{Verbatim}' + '\n')
+    literal = nodes.literal('', 'token', classes=['code'], language='python')
+
+    with pytest.raises(nodes.SkipNode):
+        translator.visit_literal(literal)
+
+    assert translator.body == [
+        r'\sphinxcode{\sphinxupquote{%' + '\n' + '  token  %' + '\n' + '}}'
+    ]
 
 
 def test_rstdim_to_latexdim():
