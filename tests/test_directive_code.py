@@ -216,6 +216,18 @@ def test_LiteralIncludeReader_prepend(literal_inc_path):
                        "Sphinx\n")
 
 
+def test_LiteralIncludeReader_dedent_and_prepend_and_append(literal_inc_path):
+    options = {'lines': '9-11', 'dedent': 4,
+               'prepend': '    Hello', 'append': '    Sphinx'}
+    reader = LiteralIncludeReader(literal_inc_path, options, DUMMY_CONFIG)
+    content, lines = reader.read()
+    assert content == ("    Hello\n"
+                       "def baz():\n"
+                       "    pass\n"
+                       "\n"
+                       "    Sphinx\n")
+
+
 @pytest.mark.xfail(os.name != 'posix', reason="Not working on windows")
 def test_LiteralIncludeReader_dedent(literal_inc_path):
     # dedent: 2
