@@ -451,8 +451,10 @@ There are also config values that you can set:
 
    If this boolean value is set to ``True`` (which is the default), autodoc will
    look at the first line of the docstring for functions and methods, and if it
-   looks like a signature, use the line as the signature and remove it from the
-   docstring content.
+   looks like a signature, use it as the signature and remove it from the
+   docstring content. Consecutive leading signatures for the same object are
+   all used, which is useful for documenting overloaded C++ functions exposed
+   through SWIG. The signatures are removed from the docstring content.
 
    .. versionadded:: 1.1
 
