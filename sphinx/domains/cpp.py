@@ -44,6 +44,7 @@ from sphinx.util.nodes import make_refnode
 
 logger = logging.getLogger(__name__)
 T = TypeVar('T')
+numeric_literal_suffix_re = re.compile(r'_[a-zA-Z_][a-zA-Z_]*')
 
 """
     Important note on ids
@@ -4665,7 +4666,7 @@ class DefinitionParser(BaseParser):
                 while self.current_char in 'uUlLfF':
                     self.pos += 1
                 if self.current_char == '_':
-                    self.match(re.compile(r'_[a-zA-Z0-9_]*'))
+                    self.match(numeric_literal_suffix_re)
                 return ASTNumberLiteral(self.definition[pos:self.pos])
 
         string = self._parse_string()

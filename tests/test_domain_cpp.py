@@ -311,10 +311,11 @@ def test_numeric_user_defined_literals():
         ast = parser.parse_expression()
         assert str(ast) == literal
 
-    parser = DefinitionParser('1 _q_s', location=None, config=Config())
-    parser.allowFallbackExpressionParsing = False
-    with pytest.raises(DefinitionError):
-        parser.parse_expression()
+    for literal in ('1 _q_s', '1_', '1_q1'):
+        parser = DefinitionParser(literal, location=None, config=Config())
+        parser.allowFallbackExpressionParsing = False
+        with pytest.raises(DefinitionError):
+            parser.parse_expression()
 
     declaration = 'int planck_constant = ' \
         '6.62607015e-34_q_J * 1_q_s'
