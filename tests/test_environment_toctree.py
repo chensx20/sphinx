@@ -131,6 +131,7 @@ def test_glob(app):
 
 @pytest.mark.sphinx('html', testroot='toctree-empty')
 def test_virtual_documents_in_toctree(app, warning):
+    app.config.numfig = True
     (app.srcdir / 'index.rst').write_text(
         'Virtual pages\n=============\n\n'
         '.. toctree::\n'
@@ -160,6 +161,9 @@ def test_virtual_documents_in_toctree(app, warning):
     assert 'genindex' not in app.env.toc_secnumbers
     assert 'modindex' not in app.env.toc_secnumbers
     assert 'search' not in app.env.toc_secnumbers
+    assert 'genindex' not in app.env.toc_fignumbers
+    assert 'modindex' not in app.env.toc_fignumbers
+    assert 'search' not in app.env.toc_fignumbers
 
     resolved = TocTree(app.env).resolve('index', app.builder, toctree)
     references = resolved.findall(reference)

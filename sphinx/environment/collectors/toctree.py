@@ -257,7 +257,8 @@ class TocTreeCollector(EnvironmentCollector):
                         _walk_doctree(docname, subnode, secnum)
                 elif isinstance(subnode, addnodes.toctree):
                     for _title, subdocname in subnode['entries']:
-                        if url_re.match(subdocname) or subdocname == 'self':
+                        if (url_re.match(subdocname) or subdocname == 'self' or
+                                subdocname in VIRTUAL_DOCS):
                             # don't mess with those
                             continue
 
