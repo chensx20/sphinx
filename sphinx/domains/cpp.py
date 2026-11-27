@@ -44,7 +44,7 @@ from sphinx.util.nodes import make_refnode
 
 logger = logging.getLogger(__name__)
 T = TypeVar('T')
-numeric_literal_suffix_re = re.compile(r'_[a-zA-Z_][a-zA-Z_]*')
+numeric_literal_suffix_re = re.compile(r'_[a-zA-Z_][a-zA-Z0-9_]*')
 
 """
     Important note on ids

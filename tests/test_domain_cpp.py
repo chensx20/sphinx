@@ -305,13 +305,13 @@ def test_numeric_user_defined_literals():
         cpp_id_attributes = ["id_attr"]
         cpp_paren_attributes = ["paren_attr"]
 
-    for literal in ('6.62607015e-34_q_J', '1_q_s', '42ULL', '1.0f'):
+    for literal in ('6.62607015e-34_q_J', '1_q_s', '1_q1', '42ULL', '1.0f'):
         parser = DefinitionParser(literal, location=None, config=Config())
         parser.allowFallbackExpressionParsing = False
         ast = parser.parse_expression()
         assert str(ast) == literal
 
-    for literal in ('1 _q_s', '1_', '1_q1'):
+    for literal in ('1 _q_s', '1_', '1_1q'):
         parser = DefinitionParser(literal, location=None, config=Config())
         parser.allowFallbackExpressionParsing = False
         with pytest.raises(DefinitionError):
