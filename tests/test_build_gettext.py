@@ -8,7 +8,41 @@ from subprocess import PIPE, CalledProcessError
 
 import pytest
 
+from sphinx.builders.gettext import Catalog, MsgOrigin
 from sphinx.util.osutil import cd
+
+
+def test_catalog_deduplicates_locations_preserving_order():
+    catalog = Catalog()
+    origins = [
+        MsgOrigin('first.rst', 1),
+        MsgOrigin('second.rst', 2),
+        MsgOrigin('first.rst', 1),
+        MsgOrigin('third.rst', 3),
+    ]
+    catalog.add('repeated message', origins[0])
+    catalog.add('repeated message', origins[1])
+    catalog.add('repeated message', origins[2])
+    catalog.add('repeated message', origins[3])
+
+    message, = catalog
+
+    assert message.locations == [
+        ('first.rst', 1), ('second.rst', 2), ('third.rst', 3),
+    ]
+    assert message.uuids == [origin.uid for origin in origins]
+
+
+def test_catalog_preserves_unique_locations():
+    catalog = Catalog()
+    origins = [MsgOrigin('first.rst', 1), MsgOrigin('second.rst', 2)]
+    for origin in origins:
+        catalog.add('unique message', origin)
+
+    message, = catalog
+
+    assert message.locations == [('first.rst', 1), ('second.rst', 2)]
+    assert message.uuids == [origin.uid for origin in origins]
 
 
 @pytest.mark.sphinx('gettext', srcdir='root-gettext')
