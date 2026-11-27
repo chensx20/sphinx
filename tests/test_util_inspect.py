@@ -341,6 +341,38 @@ def test_signature_from_str_positionaly_only_args():
     assert sig.parameters['b'].kind == Parameter.POSITIONAL_OR_KEYWORD
 
 
+@pytest.mark.skipif(sys.version_info < (3, 8),
+                    reason='python-3.8 or above is required')
+@pytest.mark.parametrize('signature, parameters', [
+    ('(a, b=0, /, c=1)', [
+        Parameter('a', Parameter.POSITIONAL_ONLY),
+        Parameter('b', Parameter.POSITIONAL_ONLY, default='0'),
+        Parameter('c', Parameter.POSITIONAL_OR_KEYWORD, default='1'),
+    ]),
+    ('(a, b=0, /)', [
+        Parameter('a', Parameter.POSITIONAL_ONLY),
+        Parameter('b', Parameter.POSITIONAL_ONLY, default='0'),
+    ]),
+    ('(a=0, b=1, /, c=2)', [
+        Parameter('a', Parameter.POSITIONAL_ONLY, default='0'),
+        Parameter('b', Parameter.POSITIONAL_ONLY, default='1'),
+        Parameter('c', Parameter.POSITIONAL_OR_KEYWORD, default='2'),
+    ]),
+    ('(a, /, b=1)', [
+        Parameter('a', Parameter.POSITIONAL_ONLY),
+        Parameter('b', Parameter.POSITIONAL_OR_KEYWORD, default='1'),
+    ]),
+    ('(a: int = 0, /, *, b=None)', [
+        Parameter('a', Parameter.POSITIONAL_ONLY, default='0', annotation='int'),
+        Parameter('b', Parameter.KEYWORD_ONLY, default='None'),
+    ]),
+])
+def test_signature_from_str_positional_only_defaults(signature, parameters):
+    sig = inspect.signature_from_str(signature)
+    assert list(sig.parameters.values()) == parameters
+    assert sig.return_annotation is Parameter.empty
+
+
 def test_signature_from_str_invalid():
     with pytest.raises(SyntaxError):
         inspect.signature_from_str('')
