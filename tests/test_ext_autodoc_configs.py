@@ -334,6 +334,18 @@ def test_autodoc_docstring_overload_signatures(app):
         '',
     ]
 
+    actual = do_autodoc(app, 'function', 'target.docstring_overloads.legacy_bare_name')
+    assert list(actual) == [
+        '',
+        '.. py:function:: legacy_bare_name(value: int)',
+        '   :module: target.docstring_overloads',
+        '',
+        '   legacy_bare_name(value: str)',
+        '',
+        '   Body after the legacy signature.',
+        '',
+    ]
+
     actual = do_autodoc(app, 'method', 'target.docstring_overloads.Overloaded.method')
     assert list(actual) == [
         '',

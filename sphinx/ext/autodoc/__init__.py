@@ -1037,8 +1037,13 @@ class DocstringSignatureMixin:
     feature of reading the signature from the docstring.
     """
 
+    def __init__(self, directive: "DocumenterBridge", name: str, indent: str = '') -> None:
+        super().__init__(directive, name, indent)  # type: ignore
+        self._signature_overloads = None  # type: Optional[List[Tuple[str, str]]]
+        self._new_docstrings = None  # type: Optional[List[List[str]]]
+
     def _find_signatures(self) -> List[Tuple[str, str]]:
-        if hasattr(self, '_signature_overloads'):
+        if self._signature_overloads is not None:
             return self._signature_overloads
         docstrings = self.get_doc()
         self._new_docstrings = docstrings[:]
@@ -1060,13 +1065,14 @@ class DocstringSignatureMixin:
 
             matches = [first]
             name = first.groups()[:3]
-            for line in doclines[1:]:
-                match = py_ext_sig_re.match(line.strip())
-                if not match:
-                    break
-                if match.groups()[:3] != name or match.groups()[3] is None:
-                    break
-                matches.append(match)
+            if exmod is not None or path is not None:
+                for line in doclines[1:]:
+                    match = py_ext_sig_re.match(line.strip())
+                    if not match:
+                        break
+                    if match.groups()[:3] != name or match.groups()[3] is None:
+                        break
+                    matches.append(match)
             self._signature_overloads = [match.groups()[3:] for match in matches]
             tab_width = self.directive.state.document.settings.tab_width  # type: ignore
             self._new_docstrings[i] = prepare_docstring(
@@ -1087,7 +1093,7 @@ class DocstringSignatureMixin:
             warnings.warn("The 'encoding' argument to autodoc.%s.get_doc() is deprecated."
                           % self.__class__.__name__,
                           RemovedInSphinx40Warning, stacklevel=2)
-        lines = getattr(self, '_new_docstrings', None)
+        lines = self._new_docstrings
         if lines is not None:
             return lines
         return super().get_doc(None, ignore)  # type: ignore
