@@ -4664,6 +4664,8 @@ class DefinitionParser(BaseParser):
             if self.match(regex):
                 while self.current_char in 'uUlLfF':
                     self.pos += 1
+                if self.current_char == '_':
+                    self.match(re.compile(r'_[a-zA-Z0-9_]*'))
                 return ASTNumberLiteral(self.definition[pos:self.pos])
 
         string = self._parse_string()
