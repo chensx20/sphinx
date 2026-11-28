@@ -493,6 +493,9 @@ class Documenter:
             return '%s:docstring of %s' % (self.analyzer.srcname, self.fullname)
         return 'docstring of %s' % self.fullname
 
+    def get_attr_doc(self, lines: List[str]) -> List[List[str]]:
+        return [list(lines)]
+
     def add_content(self, more_content: Any, no_docstring: bool = False) -> None:
         """Add content from docstrings, attribute documentation and user."""
         # set sourcename and add content from attribute documentation
@@ -505,7 +508,7 @@ class Documenter:
                     no_docstring = True
                     # make a copy of docstring for attributes to avoid cache
                     # the change of autodoc-process-docstring event.
-                    docstrings = [list(attr_docs[key])]
+                    docstrings = self.get_attr_doc(attr_docs[key])
 
                     for i, line in enumerate(self.process_doc(docstrings)):
                         self.add_line(line, sourcename, i)
@@ -1041,11 +1044,12 @@ class DocstringSignatureMixin:
         super().__init__(directive, name, indent)  # type: ignore
         self._signature_overloads = None  # type: Optional[List[Tuple[str, str]]]
         self._new_docstrings = None  # type: Optional[List[List[str]]]
+        self._signature_doc_source = 'runtime'  # type: str
 
     def _find_signatures(self) -> List[Tuple[str, str]]:
         if self._signature_overloads is not None:
             return self._signature_overloads
-        docstrings = self.get_doc()
+        docstrings = self._get_signature_docstrings()
         self._new_docstrings = docstrings[:]
         self._signature_overloads = []
         for i, doclines in enumerate(docstrings):
@@ -1079,6 +1083,9 @@ class DocstringSignatureMixin:
                 '\n'.join(doclines[len(matches):]), tabsize=tab_width)
             break
         return self._signature_overloads
+
+    def _get_signature_docstrings(self) -> List[List[str]]:
+        return self.get_doc()
 
     def _find_signature(self, encoding: str = None) -> Tuple[str, str]:
         if encoding is not None:
@@ -1743,6 +1750,24 @@ class AttributeDocumenter(DocstringStripSignatureMixin, ClassLevelDocumenter):  
     def get_real_modname(self) -> str:
         return self.get_attr(self.parent or self.object, '__module__', None) \
             or self.modname
+
+    def _get_signature_docstrings(self) -> List[List[str]]:
+        if self.analyzer and self.objpath:
+            key = ('.'.join(self.objpath[:-1]), self.objpath[-1])
+            attr_docs = self.analyzer.find_attr_docs()
+            if key in attr_docs:
+                lines = attr_docs[key]
+                first = py_ext_sig_re.match(lines[0]) if lines else None
+                if first and (first.group(1) or first.group(2)) and first.group(4):
+                    self._signature_doc_source = 'analyzer'
+                    return [list(lines)]
+        return super()._get_signature_docstrings()
+
+    def get_attr_doc(self, lines: List[str]) -> List[List[str]]:
+        if self._signature_doc_source == 'analyzer':
+            assert self._new_docstrings is not None
+            return [list(docstring) for docstring in self._new_docstrings]
+        return super().get_attr_doc(lines)
 
     def add_directive_header(self, sig: str) -> None:
         super().add_directive_header(sig)

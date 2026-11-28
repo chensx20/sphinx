@@ -21,3 +21,20 @@ class Overloaded:
 
         Method body.
         """
+
+
+class PropertyAndAttribute:
+    attribute = None
+    """PropertyAndAttribute.attribute(value: int)
+    PropertyAndAttribute.attribute(value: str)
+
+    Attribute body.
+    """
+
+    @property
+    def prop(self):
+        """PropertyAndAttribute.prop(self, value: int)
+        PropertyAndAttribute.prop(self, value: str)
+
+        Property body.
+        """

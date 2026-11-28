@@ -33,6 +33,29 @@ def test_process_docstring(app):
 
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_process_signature_for_each_overload(app):
+    processed = []
+
+    def process_signature(app, what, name, obj, options, args, retann):
+        processed.append((args, retann))
+        return args.replace('value', 'processed'), retann
+
+    app.connect('autodoc-process-signature', process_signature)
+
+    actual = do_autodoc(app, 'function', 'target.docstring_overloads.overloaded')
+    assert processed == [('(value: int)', 'int'), ('(value: str)', 'str')]
+    assert list(actual) == [
+        '',
+        '.. py:function:: overloaded(processed: int) -> int',
+        '                 overloaded(processed: str) -> str',
+        '   :module: target.docstring_overloads',
+        '',
+        '   Shared body.',
+        '',
+    ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
 def test_cut_lines(app):
     app.connect('autodoc-process-docstring',
                 cut_lines(2, 2, ['function']))

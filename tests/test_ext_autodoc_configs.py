@@ -9,7 +9,6 @@
 """
 
 import platform
-import sys
 
 import pytest
 
@@ -357,6 +356,43 @@ def test_autodoc_docstring_overload_signatures(app):
         '',
     ]
 
+    actual = do_autodoc(app, 'property',
+                        'target.docstring_overloads.PropertyAndAttribute.prop')
+    assert list(actual) == [
+        '',
+        '.. py:method:: PropertyAndAttribute.prop',
+        '   :module: target.docstring_overloads',
+        '   :property:',
+        '',
+        '   Property body.',
+        '',
+    ]
+
+    actual = do_autodoc(app, 'attribute',
+                        'target.docstring_overloads.PropertyAndAttribute.attribute')
+    assert list(actual) == [
+        '',
+        '.. py:attribute:: PropertyAndAttribute.attribute',
+        '   :module: target.docstring_overloads',
+        '   :value: None',
+        '',
+        '   Attribute body.',
+        '',
+    ]
+
+    actual = do_autodoc(app, 'function', 'target.docstring_overloads.overloaded()')
+    assert list(actual) == [
+        '',
+        '.. py:function:: overloaded()',
+        '   :module: target.docstring_overloads',
+        '',
+        '   target.docstring_overloads.overloaded(value: int) -> int',
+        '   target.docstring_overloads.overloaded(value: str) -> str',
+        '',
+        '   Shared body.',
+        '',
+    ]
+
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
 def test_autoclass_content_and_docstring_signature_class(app):
@@ -654,7 +690,6 @@ def test_autodoc_typehints_description(app):
             '   Return type:\n'
             '      Tuple[int, int]\n'
             in context)
-
 
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
