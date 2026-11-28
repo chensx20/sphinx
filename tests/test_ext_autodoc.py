@@ -630,6 +630,7 @@ def test_autodoc_inherited_members(app):
 
     assert '   .. py:attribute:: Derived.base_attr' in actual
     assert '   .. py:attribute:: Derived.base_comment' in actual
+    assert '   .. py:attribute:: Derived.ancestor_attr' in actual
 
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
@@ -642,6 +643,7 @@ def test_autodoc_inherited_members_Base(app):
     actual = do_autodoc(app, 'class', 'target.inheritance.Derived', options)
     assert '   .. py:method:: Derived.inheritedmeth()' in actual
     assert '   .. py:method:: Derived.inheritedclassmeth' not in actual
+    assert '   .. py:attribute:: Derived.ancestor_attr' not in actual
 
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc')

@@ -1,4 +1,9 @@
-class Base(object):
+class Ancestor(object):
+    def __init__(self):
+        self.ancestor_attr = None  #: Documented ancestor instance attribute.
+
+
+class Base(Ancestor):
     def __init__(self):
         self.base_attr = None  #: Documented base instance attribute.
         #: Base comment instance attribute.

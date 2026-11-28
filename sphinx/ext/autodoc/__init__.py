@@ -708,8 +708,11 @@ class Documenter:
 
         source_namespaces = {namespace}
         if inspect.isclass(self.object):
-            source_namespaces.update(cls.__qualname__
-                                     for cls in inspect.getmro(self.object))
+            for cls in inspect.getmro(self.object):
+                if cls != self.object and \
+                   cls.__name__ == self.options.inherited_members:
+                    break
+                source_namespaces.add(cls.__qualname__)
 
         # process members and determine which to skip
         for obj in members:
