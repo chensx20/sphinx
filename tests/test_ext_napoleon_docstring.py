@@ -17,7 +17,9 @@ from textwrap import dedent
 from unittest import TestCase, mock
 
 import pytest
+from docutils import nodes
 
+from sphinx import addnodes
 from sphinx.ext.napoleon import Config
 from sphinx.ext.napoleon.docstring import (
     _tokenize_type_spec,
@@ -26,6 +28,7 @@ from sphinx.ext.napoleon.docstring import (
     _token_type
 )
 from sphinx.ext.napoleon.docstring import GoogleDocstring, NumpyDocstring
+from sphinx.testing import restructuredtext
 
 
 class NamedtupleSubclass(namedtuple('NamedtupleSubclass', ('attr1', 'attr2'))):
@@ -51,6 +54,11 @@ class NamedtupleSubclass(namedtuple('NamedtupleSubclass', ('attr1', 'attr2'))):
 
 class BaseDocstringTest(TestCase):
     pass
+
+
+@pytest.fixture
+def napoleon_test_app(request, app):
+    request.instance.app = app
 
 
 class NamedtupleSubclassTest(BaseDocstringTest):
@@ -1301,6 +1309,95 @@ x, y_ , z : int
         assert ':param x: description' in actual
         assert r':param y\_: description' in actual
         assert ':param z: description' in actual
+
+    @pytest.mark.usefixtures('napoleon_test_app')
+    def test_grouped_parameter_names_rendered_doctree_and_edges(self):
+        config = Config(napoleon_use_param=True,
+                        napoleon_type_aliases={'Array': 'numpy.ndarray'})
+        source = '''Parameters
+----------
+a, b : Array, optional
+    first line
+
+    * list item
+
+    ``literal``
+missing_type, missing_desc
+empty :
+comma_type, comma_type2 : Union[int, str]
+    shared
+multiline1, multiline2 : int
+    first paragraph
+
+    second paragraph
+lists1, lists2 : int
+    * item
+literals1, literals2 : int
+    ``literal``
+
+Returns
+-------
+int
+    unchanged section'''
+        rendered = str(NumpyDocstring(source, config))
+        expected = '''\
+:param a: first line
+
+          * list item
+
+          ``literal``
+:type a: :class:`numpy.ndarray`, *optional*
+:param b: first line
+
+          * list item
+
+          ``literal``
+:type b: :class:`numpy.ndarray`, *optional*
+:param missing_type:
+:param missing_desc:
+:param empty:
+:param comma_type: shared
+:type comma_type: :class:`Union[int`, :class:`str]`
+:param comma_type2: shared
+:type comma_type2: :class:`Union[int`, :class:`str]`
+:param multiline1: first paragraph
+
+                   second paragraph
+:type multiline1: :class:`int`
+:param multiline2: first paragraph
+
+                   second paragraph
+:type multiline2: :class:`int`
+:param lists1:
+               * item
+:type lists1: :class:`int`
+:param lists2:
+               * item
+:type lists2: :class:`int`
+:param literals1: ``literal``
+:type literals1: :class:`int`
+:param literals2: ``literal``
+:type literals2: :class:`int`
+
+:returns: unchanged section
+:rtype: int
+'''
+        assert rendered == expected
+
+        text = '.. default-domain:: py\n\n.. py:function:: sample()\n\n' + ''.join(
+            '   ' + line + '\n' for line in rendered.splitlines()
+        )
+        doctree = restructuredtext.parse(self.app, text)
+        names = [node.astext() for node in doctree.traverse(addnodes.literal_strong)]
+        assert names.count('a') == 1
+        assert names.count('b') == 1
+        assert names.count('comma_type') == 1
+        assert names.count('comma_type2') == 1
+        assert len(list(doctree.traverse(nodes.bullet_list))) == 5
+        literals = [node.astext() for node in doctree.traverse(nodes.literal)]
+        assert literals.count('literal') == 4
+        assert not list(doctree.traverse(nodes.problematic))
+        assert 'unchanged section' in doctree.astext()
 
     def _assert_grouped_parameter_names(self, use_param, optional):
         type_spec = 'array_like, optional' if optional else 'array_like'
