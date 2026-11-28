@@ -838,6 +838,53 @@ def test_info_field_list(app):
                 **{"py:module": "example", "py:class": "Class"})
 
 
+def test_variable_field_names_are_not_references(app):
+    text = (".. py:module:: example\n"
+            "\n"
+            ".. py:data:: shared\n"
+            "\n"
+            ".. py:class:: Container\n"
+            "\n"
+            "   :ivar str shared: See :py:obj:`shared`.\n"
+            "   :ivar int another: Another description.\n"
+            "   :cvar int class_shared: Class description.\n"
+            "   :var float module_shared: Module description.\n")
+    doctree = restructuredtext.parse(app, text)
+    variable_fields = list(doctree.traverse(nodes.field))
+    assert len(variable_fields) == 1
+    field = variable_fields[0]
+    assert field[0].astext() == 'Variables'
+    names = list(field.traverse(addnodes.literal_strong))
+    assert [name.astext() for name in names] == [
+        'shared', 'another', 'class_shared', 'module_shared']
+    assert all(not isinstance(name.parent, pending_xref) for name in names)
+    references = list(doctree.traverse(pending_xref))
+    assert [reference['reftarget'] for reference in references] == [
+        'str', 'shared', 'int', 'int', 'float']
+    assert all(reference['reftype'] == 'class'
+               for reference in (references[0], *references[2:]))
+    assert references[1]['reftype'] == 'obj'
+
+
+@pytest.mark.sphinx('html', testroot='domain-py')
+def test_variable_field_collisions(app):
+    app.builder.build_all()
+    doctree = app.env.get_and_resolve_doctree('variable-fields', app.builder)
+    fields = list(doctree.traverse(nodes.field))
+    assert [field[0].astext() for field in fields] == ['Variables', 'Variables']
+    assert isinstance(fields[0][1][0], nodes.bullet_list)
+    assert isinstance(fields[1][1][0], nodes.paragraph)
+    for field in fields:
+        names = list(field.traverse(addnodes.literal_strong))
+        assert all(not isinstance(name.parent, nodes.reference) for name in names)
+    assert [name.astext() for field in fields
+            for name in field.traverse(addnodes.literal_strong)] == [
+                'other.shared', 'other.Other.class_shared', 'typed', 'other.shared']
+    references = list(fields[0].traverse(nodes.reference))
+    assert [reference['refid'] for reference in references] == [
+        'other.Kind', 'other.shared']
+
+
 @pytest.mark.sphinx(freshenv=True)
 def test_module_index(app):
     text = (".. py:module:: docutils\n"
