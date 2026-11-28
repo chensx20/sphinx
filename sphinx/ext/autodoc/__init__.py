@@ -2658,10 +2658,23 @@ class PropertyDocumenter(DocstringStripSignatureMixin, ClassLevelDocumenter):  #
     # before AttributeDocumenter
     priority = AttributeDocumenter.priority + 1
 
+    def import_object(self, raiseerror: bool = False) -> bool:
+        ret = super().import_object(raiseerror)
+        if ret and isinstance(self.object, classmethod):
+            self.object = self.object.__func__
+            self.classmethod = True
+        else:
+            self.classmethod = False
+
+        return ret
+
     @classmethod
     def can_document_member(cls, member: Any, membername: str, isattr: bool, parent: Any
                             ) -> bool:
-        return inspect.isproperty(member) and isinstance(parent, ClassDocumenter)
+        is_property = (inspect.isproperty(member) or
+                       isinstance(member, classmethod) and
+                       inspect.isproperty(member.__func__))
+        return is_property and isinstance(parent, ClassDocumenter)
 
     def document_members(self, all_members: bool = False) -> None:
         pass
@@ -2673,6 +2686,9 @@ class PropertyDocumenter(DocstringStripSignatureMixin, ClassLevelDocumenter):  #
     def add_directive_header(self, sig: str) -> None:
         super().add_directive_header(sig)
         sourcename = self.get_sourcename()
+        if self.classmethod:
+            self.add_line('   :classmethod:', sourcename)
+
         if inspect.isabstractmethod(self.object):
             self.add_line('   :abstractmethod:', sourcename)
 
