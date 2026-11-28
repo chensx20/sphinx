@@ -555,6 +555,8 @@ def test_autodoc_members(app):
     actual = do_autodoc(app, 'class', 'target.inheritance.Base', options)
     assert list(filter(lambda l: '::' in l, actual)) == [
         '.. py:class:: Base()',
+        '   .. py:attribute:: Base.base_attr',
+        '   .. py:attribute:: Base.base_comment',
         '   .. py:method:: Base.inheritedclassmeth()',
         '   .. py:method:: Base.inheritedmeth()',
         '   .. py:method:: Base.inheritedstaticmeth(cls)'
@@ -577,6 +579,8 @@ def test_autodoc_exclude_members(app):
     actual = do_autodoc(app, 'class', 'target.inheritance.Base', options)
     assert list(filter(lambda l: '::' in l, actual)) == [
         '.. py:class:: Base()',
+        '   .. py:attribute:: Base.base_attr',
+        '   .. py:attribute:: Base.base_comment',
         '   .. py:method:: Base.inheritedclassmeth()'
     ]
 
@@ -623,6 +627,9 @@ def test_autodoc_inherited_members(app):
         '   .. py:method:: Derived.inheritedmeth()',
         '   .. py:method:: Derived.inheritedstaticmeth(cls)',
     ]
+
+    assert '   .. py:attribute:: Derived.base_attr' in actual
+    assert '   .. py:attribute:: Derived.base_comment' in actual
 
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc')

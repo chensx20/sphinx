@@ -597,8 +597,25 @@ class Documenter:
         if self.analyzer:
             attr_docs = self.analyzer.find_attr_docs()
             if self.objpath:
-                key = ('.'.join(self.objpath[:-1]), self.objpath[-1])
-                if key in attr_docs:
+                parent = self.parent
+                key = None
+                if inspect.isclass(parent):
+                    for cls in inspect.getmro(parent):
+                        candidate = (cls.__qualname__, self.objpath[-1])
+                        try:
+                            base_docs = ModuleAnalyzer.for_module(
+                                cls.__module__).find_attr_docs()
+                        except PycodeError:
+                            continue
+                        if candidate in base_docs:
+                            attr_docs = base_docs
+                            key = candidate
+                            break
+                else:
+                    candidate = ('.'.join(self.objpath[:-1]), self.objpath[-1])
+                    if candidate in attr_docs:
+                        key = candidate
+                if key is not None:
                     no_docstring = True
                     # make a copy of docstring for attributes to avoid cache
                     # the change of autodoc-process-docstring event.
@@ -689,6 +706,11 @@ class Documenter:
         else:
             attr_docs = {}
 
+        source_namespaces = {namespace}
+        if inspect.isclass(self.object):
+            source_namespaces.update(cls.__qualname__
+                                     for cls in inspect.getmro(self.object))
+
         # process members and determine which to skip
         for obj in members:
             membername, member = obj
@@ -746,7 +768,8 @@ class Documenter:
                         keep = has_doc or self.options.undoc_members
                 else:
                     keep = False
-            elif (namespace, membername) in attr_docs:
+            elif any((source_namespace, membername) in attr_docs
+                     for source_namespace in source_namespaces):
                 if want_all and isprivate:
                     if self.options.private_members is None:
                         keep = False
@@ -2282,6 +2305,9 @@ class AttributeDocumenter(GenericAliasMixin, NewTypeMixin, SlotsMixin,  # type: 
                 annotations = get_type_hints(self.parent, None,
                                              self.config.autodoc_type_aliases)
                 if self.objpath[-1] in annotations:
+                    self.object = UNINITIALIZED_ATTR
+                    return True
+                if self.get_attribute_comment(self.parent):
                     self.object = UNINITIALIZED_ATTR
                     return True
             except ImportError:
