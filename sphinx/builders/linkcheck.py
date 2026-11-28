@@ -223,6 +223,8 @@ class CheckExternalLinksBuilder(Builder):
                     local_path = unquote(urlsplit(uri).path)
                 except ValueError as err:
                     return 'broken', str(err), 0
+                if local_path.startswith('/'):
+                    return 'broken', __('target not found'), 0
 
                 suffix = self.config.html_file_suffix
                 if suffix is None:
@@ -232,19 +234,20 @@ class CheckExternalLinksBuilder(Builder):
                 if not local_path:
                     target_path = current_path
                 else:
-                    target_path = ''
-                if not target_path and (local_path.endswith('/') or
-                                        not posixpath.splitext(local_path)[1]):
+                    target_path = posixpath.normpath(posixpath.join(
+                        posixpath.dirname(current_path), local_path))
+                if local_path and (local_path.endswith('/') or
+                                   not posixpath.splitext(local_path)[1]):
                     target_doc = posixpath.normpath(posixpath.join(
                         posixpath.dirname(docname), local_path, 'index'))
                     target_path = target_doc + suffix
-                elif not target_path:
-                    target_path = posixpath.normpath(posixpath.join(
-                        posixpath.dirname(current_path), local_path))
-                output_root = path.abspath(self.outdir)
-                output_path = path.abspath(path.join(output_root, target_path))
-                if target_path != '..' and not target_path.startswith('../') and \
-                        path.isfile(output_path):
+                output_root = path.realpath(self.outdir)
+                output_path = path.realpath(path.join(output_root, target_path))
+                try:
+                    contained = path.commonpath((output_root, output_path)) == output_root
+                except ValueError:
+                    contained = False
+                if contained and path.isfile(output_path):
                     return 'local', '', 0
                 else:
                     return 'broken', __('target not found'), 0
