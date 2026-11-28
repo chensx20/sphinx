@@ -1082,6 +1082,8 @@ class NumpyDocstring(GoogleDocstring):
     def _escape_args_and_kwargs(self, name: str) -> str:
         func = super()._escape_args_and_kwargs
 
+        if getattr(self, '_split_parameter_names', False):
+            return ', '.join(func(param.strip()) for param in name.split(','))
         if ", " in name:
             return ", ".join(func(param) for param in name.split(", "))
         else:
@@ -1110,14 +1112,19 @@ class NumpyDocstring(GoogleDocstring):
         return _name, _type, _desc
 
     def _parse_parameters_section(self, section: str) -> List[str]:
-        fields = self._consume_fields()
         if self._config.napoleon_use_param:
+            self._split_parameter_names = True
+            try:
+                fields = self._consume_fields()
+            finally:
+                del self._split_parameter_names
             expanded_fields = [
                 (name.strip(), _type, _desc)
                 for _name, _type, _desc in fields
                 for name in _name.split(',')
             ]
             return self._format_docutils_params(expanded_fields)
+        fields = self._consume_fields()
         return self._format_fields(_('Parameters'), fields)
 
     def _consume_returns_section(self) -> List[Tuple[str, str, List[str]]]:

@@ -1284,6 +1284,24 @@ next : int
         assert (actual.index(':param x1:') < actual.index(':param x2:') <
                 actual.index(':param x3:'))
 
+    def test_grouped_parameter_names_escape_each_name(self):
+        config = Config()
+        actual = str(NumpyDocstring('''Parameters
+----------
+x,*args : int
+    description''', config))
+        assert ':param x: description' in actual
+        assert r':param \*args: description' in actual
+
+        config = Config(strip_signature_backslash=True)
+        actual = str(NumpyDocstring('''Parameters
+----------
+x, y_ , z : int
+    description''', config))
+        assert ':param x: description' in actual
+        assert r':param y\_: description' in actual
+        assert ':param z: description' in actual
+
     def _assert_grouped_parameter_names(self, use_param, optional):
         type_spec = 'array_like, optional' if optional else 'array_like'
         config = Config(napoleon_use_param=use_param)
