@@ -508,6 +508,20 @@ def test_pydata(app):
     assert domain.objects['example.var'] == ('index', 'example.var', 'data')
 
 
+@pytest.mark.sphinx('dummy', testroot='domain-py-info-fields')
+def test_info_field_list(app, warning):
+    app.builder.build_all()
+    assert warning.getvalue() == ''
+    doctree = app.env.get_doctree('index')
+    refnodes = list(doctree.traverse(pending_xref))
+    assert len(refnodes) == 3
+    assert all(node['py:module'] == 'mod.submod' for node in refnodes)
+    resolved = app.env.get_and_resolve_doctree('index', app.builder)
+    links = [node['refid'] for node in resolved.traverse(nodes.reference)
+             if 'refid' in node]
+    assert links == ['mod.submod.A'] * 3
+
+
 def test_pyfunction(app):
     text = (".. py:function:: func1\n"
             ".. py:module:: example\n"
