@@ -14,7 +14,7 @@ import warnings
 from typing import Any, Callable, Dict, List, Mapping, NamedTuple, Optional, Tuple
 
 from sphinx.deprecation import RemovedInSphinx40Warning, deprecated_alias
-from sphinx.pycode import ModuleAnalyzer
+from sphinx.pycode import ModuleAnalyzer, PycodeError
 from sphinx.util import logging
 from sphinx.util.inspect import (getannotations, getmro, getslots, isclass, isenumclass,
                                  safe_getattr)
@@ -307,10 +307,31 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable,
         except AttributeError:
             pass
 
+    resolved = set()
+    for index, cls in enumerate(getmro(subject)):
+        try:
+            cls_analyzer = (analyzer if cls is subject else
+                            ModuleAnalyzer.for_module(cls.__module__))
+            docs = cls_analyzer.find_attr_docs() if cls_analyzer else {}
+        except PycodeError:
+            docs = {}
+        namespace = '.'.join(objpath) if index == 0 else cls.__qualname__
+        names = set(cls.__dict__) | set(getannotations(cls))
+        names.update(name for ns, name in docs if ns == namespace)
+        for name in names - resolved:
+            key = (namespace, name)
+            if key in docs:
+                value = members[name].value if name in members else INSTANCEATTR
+                if index == 0:
+                    members[name] = ClassAttribute(cls, name, value, '\n'.join(docs[key]))
+                elif name not in members:
+                    members[name] = ClassAttribute(cls, name, INSTANCEATTR,
+                                                   '\n'.join(docs[key]))
+        resolved.update(names)
+
     if analyzer:
-        # append instance attributes (cf. self.attr1) if analyzer knows
         namespace = '.'.join(objpath)
-        for (ns, name), docstring in analyzer.attr_docs.items():
+        for (ns, name), docstring in analyzer.find_attr_docs().items():
             if namespace == ns and name not in members:
                 members[name] = ClassAttribute(subject, name, INSTANCEATTR,
                                                '\n'.join(docstring))
