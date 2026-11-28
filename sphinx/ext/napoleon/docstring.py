@@ -1109,6 +1109,17 @@ class NumpyDocstring(GoogleDocstring):
         _desc = self.__class__(_desc, self._config).lines()
         return _name, _type, _desc
 
+    def _parse_parameters_section(self, section: str) -> List[str]:
+        fields = self._consume_fields()
+        if self._config.napoleon_use_param:
+            expanded_fields = [
+                (name.strip(), _type, _desc)
+                for _name, _type, _desc in fields
+                for name in _name.split(',')
+            ]
+            return self._format_docutils_params(expanded_fields)
+        return self._format_fields(_('Parameters'), fields)
+
     def _consume_returns_section(self) -> List[Tuple[str, str, List[str]]]:
         return self._consume_fields(prefer_type=True)
 

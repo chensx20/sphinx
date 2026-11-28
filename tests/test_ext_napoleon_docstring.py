@@ -19,13 +19,13 @@ from unittest import TestCase, mock
 import pytest
 
 from sphinx.ext.napoleon import Config
-from sphinx.ext.napoleon.docstring import GoogleDocstring, NumpyDocstring
 from sphinx.ext.napoleon.docstring import (
     _tokenize_type_spec,
     _recombine_set_tokens,
     _convert_numpy_type_spec,
     _token_type
 )
+from sphinx.ext.napoleon.docstring import GoogleDocstring, NumpyDocstring
 
 
 class NamedtupleSubclass(namedtuple('NamedtupleSubclass', ('attr1', 'attr2'))):
@@ -1230,7 +1230,7 @@ class NumpyDocstringTest(BaseDocstringTest):
         """
         Single line summary
 
-        :Parameters: * **arg1** (*str*) -- Extended description of arg1
+        :Parameters: * **arg1** (:class:`str`) -- Extended description of arg1
                      * **\\*args, \\*\\*kwargs** -- Variable length argument list and arbitrary keyword arguments.
         """
     ), (
@@ -1266,6 +1266,43 @@ class NumpyDocstringTest(BaseDocstringTest):
                  description of yielded value
         """
     )]
+
+    def test_grouped_parameter_names(self):
+        for use_param in (True, False):
+            for optional in (False, True):
+                self._assert_grouped_parameter_names(use_param, optional)
+
+        config = Config()
+        actual = str(NumpyDocstring('''Parameters
+----------
+x1,  x2 , x3 : array_like
+    shared description
+next : int
+    next description''', config))
+        assert ':param x3: shared description' in actual
+        assert ':param next: next description' in actual
+        assert (actual.index(':param x1:') < actual.index(':param x2:') <
+                actual.index(':param x3:'))
+
+    def _assert_grouped_parameter_names(self, use_param, optional):
+        type_spec = 'array_like, optional' if optional else 'array_like'
+        config = Config(napoleon_use_param=use_param)
+        docstring = '''Parameters
+----------
+x1, x2 : %s
+    shared description
+''' % type_spec
+        actual = str(NumpyDocstring(docstring, config))
+        if use_param:
+            expected = ''':param x1: shared description
+:type x1: :class:`array_like`{optional}
+:param x2: shared description
+:type x2: :class:`array_like`{optional}
+'''.format(optional=', *optional*' if optional else '')
+        else:
+            expected = ''':Parameters: **x1, x2** (:class:`array_like`%s) -- shared description
+''' % (', *optional*' if optional else '')
+        assert actual == expected
 
     def test_sphinx_admonitions(self):
         admonition_map = {
