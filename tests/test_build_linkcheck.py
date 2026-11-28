@@ -104,6 +104,34 @@ def test_anchors_ignored(app, status, warning):
     assert not content
 
 
+@pytest.mark.sphinx('linkcheck', testroot='linkcheck-local', freshenv=True)
+def test_local_links(app):
+    (app.outdir / 'target.html').write_text('Generated target')
+    (app.outdir / 'asset file.txt').write_text('Generated asset')
+    app.builder.build_all()
+
+    rows = [json.loads(line) for line in
+            (app.outdir / 'output.json').read_text().splitlines()]
+    rows_by_uri = {row['uri']: row for row in rows}
+
+    assert rows_by_uri['../target.html?view=full#section']['status'] == 'local'
+    assert rows_by_uri['../target.html?view=full#section']['info'] == ''
+    assert rows_by_uri['../asset%20file.txt#section']['status'] == 'local'
+    assert rows_by_uri['../missing.html']['status'] == 'broken'
+    assert rows_by_uri['missing.html']['status'] == 'broken'
+    assert rows_by_uri['missing.html']['info'] == 'target not found'
+    assert rows_by_uri['#section']['status'] == 'unchecked'
+    assert rows_by_uri['mailto:docs@example.com']['status'] == 'unchecked'
+    assert rows_by_uri['custom://host/path']['status'] == 'local'
+    assert rows_by_uri['//example.com/path']['status'] == 'local'
+    assert rows_by_uri['ignored.html']['status'] == 'ignored'
+
+    output = (app.outdir / 'output.txt').read_text()
+    assert '[broken] missing.html: target not found' in output
+    assert '[local] ../target.html?view=full#section' in output
+    assert app.statuscode == 1
+
+
 @pytest.mark.sphinx(
     'linkcheck', testroot='linkcheck', freshenv=True,
     confoverrides={'linkcheck_auth': [
