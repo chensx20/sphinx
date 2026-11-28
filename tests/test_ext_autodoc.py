@@ -305,6 +305,17 @@ def test_autodoc_process_signature_typing_generic(app):
     ]
 
 
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_autodoc_tuple_defaults(app):
+    app.build()
+
+    html = (app.outdir / 'index.html').read_text()
+    assert ('<span class="n">color</span><span class="o">=</span>'
+            '<span class="default_value">(1, 1, 1)</span></em>, '
+            '<em class="sig-param"><span class="n">width</span>'
+            '<span class="o">=</span><span class="default_value">1</span></em>') in html
+
+
 def test_autodoc_process_signature_typehints(app):
     captured = []
 

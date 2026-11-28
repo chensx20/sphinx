@@ -151,7 +151,10 @@ class _UnparseVisitor(ast.NodeVisitor):
         return "{" + ", ".join(items) + "}"
 
     def visit_Index(self, node: ast.Index) -> str:
-        return self.visit(node.value)
+        value = self.visit(node.value)
+        if isinstance(node.value, ast.Tuple):
+            return value[1:-1]
+        return value
 
     def visit_Lambda(self, node: ast.Lambda) -> str:
         return "lambda %s: ..." % self.visit(node.args)
@@ -166,14 +169,20 @@ class _UnparseVisitor(ast.NodeVisitor):
         return "{" + ", ".join(self.visit(e) for e in node.elts) + "}"
 
     def visit_Subscript(self, node: ast.Subscript) -> str:
-        return "%s[%s]" % (self.visit(node.value), self.visit(node.slice))
+        slice_ = self.visit(node.slice)
+        if isinstance(node.slice, ast.Tuple):
+            slice_ = slice_[1:-1]
+        return "%s[%s]" % (self.visit(node.value), slice_)
 
     def visit_UnaryOp(self, node: ast.UnaryOp) -> str:
         return "%s %s" % (self.visit(node.op), self.visit(node.operand))
 
     def visit_Tuple(self, node: ast.Tuple) -> str:
         if node.elts:
-            return ", ".join(self.visit(e) for e in node.elts)
+            items = ", ".join(self.visit(e) for e in node.elts)
+            if len(node.elts) == 1:
+                items += ","
+            return "(%s)" % items
         else:
             return "()"
 
