@@ -48,6 +48,7 @@ Bugs fixed
 * #8597: autodoc: a docsting having metadata only should be treated as
   undocumented
 * #9185: autodoc: typehints for overloaded functions and methods are inaccurate
+* #9229: autodoc: render variable comments for aliased classes
 
 Testing
 --------

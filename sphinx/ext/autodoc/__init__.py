@@ -1673,8 +1673,24 @@ class ClassDocumenter(DocstringSignatureMixin, ModuleLevelDocumenter):  # type: 
         else:
             return False, [m for m in members.values() if m.class_ == self.object]
 
+    def get_module_comment(self, attrname: str) -> Optional[List[str]]:
+        try:
+            analyzer = ModuleAnalyzer.for_module(self.modname)
+            analyzer.analyze()
+            key = ('', attrname)
+            if key in analyzer.attr_docs:
+                return list(analyzer.attr_docs[key])
+        except PycodeError:
+            pass
+
+        return None
+
     def get_doc(self, ignore: int = None) -> Optional[List[List[str]]]:
         if self.doc_as_attr:
+            comment = self.get_module_comment(self.objpath[-1])
+            if comment:
+                return [comment]
+
             # Don't show the docstring of the class when it is an alias.
             return None
 
@@ -1724,10 +1740,12 @@ class ClassDocumenter(DocstringSignatureMixin, ModuleLevelDocumenter):  # type: 
     def add_content(self, more_content: Optional[StringList], no_docstring: bool = False
                     ) -> None:
         if self.doc_as_attr:
-            try:
-                more_content = StringList([_('alias of %s') % restify(self.object)], source='')
-            except AttributeError:
-                pass  # Invalid class object is passed.
+            if not self.get_module_comment(self.objpath[-1]):
+                try:
+                    more_content = StringList([_('alias of %s') % restify(self.object)],
+                                              source='')
+                except AttributeError:
+                    pass  # Invalid class object is passed.
 
         super().add_content(more_content)
 
