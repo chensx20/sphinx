@@ -11,3 +11,5 @@
 .. autofunction:: target.typehints.incr
 
 .. autofunction:: target.typehints.tuple_args
+
+.. automethod:: target.tuple_defaults.Foo.bar
