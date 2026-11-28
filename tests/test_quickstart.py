@@ -198,6 +198,35 @@ def test_generated_files_eol(tempdir):
     assert_eol(tempdir / 'Makefile', '\n')
 
 
+def test_existing_conf_empty_root_path_cancels(tempdir, monkeypatch):
+    (tempdir / 'conf.py').write_text('')
+    monkeypatch.setattr(qs, 'term_input', lambda prompt: '')
+
+    with pytest.raises(SystemExit) as exc_info:
+        qs.ask_user({'path': str(tempdir)})
+
+    assert exc_info.value.code == 1
+
+
+def test_existing_conf_invalid_root_path_reprompts(tempdir, monkeypatch, capsys):
+    (tempdir / 'conf.py').write_text('')
+    answers = iter(['not-a-directory', ''])
+    prompts = []
+
+    def input_(prompt):
+        prompts.append(prompt)
+        return next(answers)
+
+    monkeypatch.setattr(qs, 'term_input', input_)
+
+    with pytest.raises(SystemExit) as exc_info:
+        qs.ask_user({'path': str(tempdir)})
+
+    assert exc_info.value.code == 1
+    assert len(prompts) == 2
+    assert 'Please enter a valid path name.' in capsys.readouterr().out
+
+
 def test_quickstart_and_build(tempdir):
     answers = {
         'Root path': tempdir,
