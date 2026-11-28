@@ -11,7 +11,9 @@
 import json
 import re
 from unittest import mock
+
 import pytest
+from requests.exceptions import HTTPError
 
 
 @pytest.mark.sphinx('linkcheck', testroot='linkcheck', freshenv=True)
@@ -105,6 +107,44 @@ def test_anchors_ignored(app, status, warning):
 
     # expect all ok when excluding #top
     assert not content
+
+
+@pytest.mark.sphinx(
+    'linkcheck', testroot='linkcheck', freshenv=True,
+    confoverrides={'linkcheck_retries': 1})
+def test_raises_for_invalid_status(app, status, warning):
+    (app.srcdir / 'links.txt').write_text(
+        'Broken anchor <https://www.google.com/#top>_\n')
+    response = mock.Mock(url='https://www.google.com/', history=[])
+    response.raise_for_status.side_effect = HTTPError(
+        '404 Client Error: Not Found for url: https://www.google.com/',
+        response=mock.Mock(status_code=404),
+    )
+    with mock.patch('sphinx.builders.linkcheck.check_anchor') as check_anchor:
+        with mock.patch('requests.get', return_value=response):
+            app.builder.build_all()
+
+    check_anchor.assert_not_called()
+    content = (app.outdir / 'output.txt').read_text()
+    assert '404 Client Error: Not Found for url: https://www.google.com/' in content
+    assert "Anchor 'top' not found" not in content
+
+
+@pytest.mark.sphinx(
+    'linkcheck', testroot='linkcheck', freshenv=True,
+    confoverrides={'linkcheck_retries': 1})
+def test_raises_for_missing_anchor(app, status, warning):
+    (app.srcdir / 'links.txt').write_text(
+        'Missing anchor <https://www.google.com/#absent>_\n')
+    response = mock.Mock(url='https://www.google.com/', history=[])
+    response.raise_for_status.return_value = None
+    response.iter_content.return_value = [b'<html></html>']
+
+    with mock.patch('requests.get', return_value=response):
+        app.builder.build_all()
+
+    content = (app.outdir / 'output.txt').read_text()
+    assert "Anchor 'absent' not found" in content
 
 
 @pytest.mark.sphinx(
