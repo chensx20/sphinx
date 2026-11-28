@@ -10,6 +10,7 @@
 
 import ast
 import datetime
+import enum
 import functools
 import sys
 import types
@@ -64,6 +65,63 @@ def test_signature():
 
     sig = inspect.stringify_signature(inspect.signature(func))
     assert sig == '(a, b, c=1, d=2, *e, **f)'
+
+
+def test_enum_object_description():
+    class MyEnum(enum.Enum):
+        ValueA = 10
+        AliasA = 10
+
+    class MyIntEnum(enum.IntEnum):
+        ValueB = 20
+
+    class MyStringEnum(str, enum.Enum):
+        ValueC = 'value'
+
+    class MyCustomEnum(enum.Enum):
+        ValueD = 30
+
+        def __repr__(self):
+            return 'custom repr'
+
+        def __str__(self):
+            return 'custom str'
+
+    class MyFlag(enum.Flag):
+        ValueE = 1
+        ValueF = 2
+
+    assert inspect.object_description(MyEnum.ValueA) == 'MyEnum.ValueA'
+    assert inspect.object_description(MyEnum.AliasA) == 'MyEnum.ValueA'
+    assert inspect.object_description(MyIntEnum.ValueB) == 'MyIntEnum.ValueB'
+    assert inspect.object_description(MyStringEnum.ValueC) == 'MyStringEnum.ValueC'
+    assert inspect.object_description(MyCustomEnum.ValueD) == 'MyCustomEnum.ValueD'
+    assert inspect.object_description(MyFlag.ValueE) == 'MyFlag.ValueE'
+    combined = MyFlag.ValueE | MyFlag.ValueF
+    assert inspect.object_description(combined) == repr(combined)
+
+
+def test_stringify_signature_with_enum_defaults():
+    class MyEnum(enum.Enum):
+        ValueA = 10
+
+    def annotated(value: MyEnum = MyEnum.ValueA) -> None:
+        pass
+
+    def unannotated(value=MyEnum.ValueA):
+        pass
+
+    def keyword_only(*, value: MyEnum = MyEnum.ValueA):
+        pass
+
+    assert stringify_signature(inspect.signature(annotated)).endswith(
+        '= MyEnum.ValueA) -> None')
+    assert stringify_signature(inspect.signature(unannotated)) == (
+        '(value=MyEnum.ValueA)')
+    assert stringify_signature(inspect.signature(keyword_only)).endswith(
+        '= MyEnum.ValueA)')
+    assert stringify_signature(inspect.signature(annotated), show_annotation=False) == (
+        '(value=MyEnum.ValueA)')
 
 
 def test_signature_partial():

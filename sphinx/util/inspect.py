@@ -432,6 +432,10 @@ def safe_getattr(obj: Any, name: str, *defargs: Any) -> Any:
 
 def object_description(object: Any) -> str:
     """A repr() implementation that returns text safe to use in reST context."""
+    if isenumattribute(object):
+        name = object.name
+        if object.__class__.__members__.get(name) is object:
+            return '%s.%s' % (object.__class__.__name__, name)
     if isinstance(object, dict):
         try:
             sorted_keys = sorted(object)
