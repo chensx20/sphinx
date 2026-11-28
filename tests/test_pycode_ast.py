@@ -53,6 +53,7 @@ from sphinx.pycode import ast
     ("+ a", "+ a"),                             # UAdd
     ("- 1", "- 1"),                             # UnaryOp
     ("- a", "- a"),                             # USub
+    ("(1,)", "(1,)"),                           # Tuple (singleton)
     ("(1, 2, 3)", "(1, 2, 3)"),                   # Tuple
     ("()", "()"),                               # Tuple (empty)
 ])
