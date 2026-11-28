@@ -31,6 +31,13 @@ def test_autodata(app):
 
 
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_enum_data_value(app):
+    actual = do_autodoc(app, 'data', 'target.enums.ENUM_VALUE')
+    assert '.. py:data:: ENUM_VALUE' in actual
+    assert '   :value: MyEnum.ValueA' in actual
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
 def test_autodata_novalue(app):
     options = {'no-value': True}
     actual = do_autodoc(app, 'data', 'target.integer', options)

@@ -21,3 +21,30 @@ class EnumCls(enum.Enum):
     def say_goodbye(cls):
         """a classmethod says good-bye to you."""
         pass
+
+
+class MyEnum(enum.Enum):
+    ValueA = 10
+
+
+class MyIntEnum(enum.IntEnum):
+    ValueB = 20
+
+
+class MyStringEnum(str, enum.Enum):
+    ValueC = 'value'
+
+
+def ugly_enum_func(e: MyEnum = MyEnum.ValueA) -> None:
+    """Function with an Enum default."""
+
+
+def unannotated_enum_func(e=MyEnum.ValueA):
+    """Function with an unannotated Enum default."""
+
+
+def keyword_only_enum_func(*, e: MyEnum = MyEnum.ValueA) -> None:
+    """Function with a keyword-only Enum default."""
+
+
+ENUM_VALUE = MyEnum.ValueA

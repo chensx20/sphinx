@@ -23,7 +23,6 @@ def test_classes(app):
         '   :module: target.classes',
         '',
     ]
-
     actual = do_autodoc(app, 'function', 'target.classes.Bar')
     assert list(actual) == [
         '',
@@ -31,6 +30,27 @@ def test_classes(app):
         '   :module: target.classes',
         '',
     ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_enum_defaults(app):
+    actual = do_autodoc(app, 'function', 'target.enums.ugly_enum_func')
+    assert list(actual) == [
+        '',
+        ('.. py:function:: ugly_enum_func(e: target.enums.MyEnum = '
+         'MyEnum.ValueA) -> None'),
+        '   :module: target.enums',
+        '',
+        '   Function with an Enum default.',
+        '',
+    ]
+
+    actual = do_autodoc(app, 'function', 'target.enums.unannotated_enum_func')
+    assert '.. py:function:: unannotated_enum_func(e=MyEnum.ValueA)' in actual
+
+    actual = do_autodoc(app, 'function', 'target.enums.keyword_only_enum_func')
+    assert ('.. py:function:: keyword_only_enum_func(*, e: target.enums.MyEnum = '
+            'MyEnum.ValueA) -> None' in actual)
 
     actual = do_autodoc(app, 'function', 'target.classes.Baz')
     assert list(actual) == [
