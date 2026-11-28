@@ -33,6 +33,7 @@ from sphinx.pycode import ast
     ("...", "..."),                             # Ellipsis
     ("a // b", "a // b"),                       # FloorDiv
     ("Tuple[int, int]", "Tuple[int, int]"),     # Index, Subscript
+    ("A[()]", "A[()]"),                         # Subscript (empty tuple)
     ("~ 1", "~ 1"),                             # Invert
     ("lambda x, y: x + y",
      "lambda x, y: ..."),                       # Lambda

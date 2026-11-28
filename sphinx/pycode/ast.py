@@ -152,7 +152,7 @@ class _UnparseVisitor(ast.NodeVisitor):
 
     def visit_Index(self, node: ast.Index) -> str:
         value = self.visit(node.value)
-        if isinstance(node.value, ast.Tuple):
+        if isinstance(node.value, ast.Tuple) and node.value.elts:
             return value[1:-1]
         return value
 
@@ -170,7 +170,7 @@ class _UnparseVisitor(ast.NodeVisitor):
 
     def visit_Subscript(self, node: ast.Subscript) -> str:
         slice_ = self.visit(node.slice)
-        if isinstance(node.slice, ast.Tuple):
+        if isinstance(node.slice, ast.Tuple) and node.slice.elts:
             slice_ = slice_[1:-1]
         return "%s[%s]" % (self.visit(node.value), slice_)
 
