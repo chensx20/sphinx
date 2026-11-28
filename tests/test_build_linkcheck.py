@@ -274,6 +274,35 @@ def test_follows_redirects_on_GET(app, capsys):
     )
 
 
+@pytest.mark.sphinx('linkcheck', testroot='linkcheck-localserver', freshenv=True)
+def test_falls_back_to_GET_when_HEAD_redirects_too_many_times(app, capsys):
+    class RedirectLoopOnHEADHandler(http.server.BaseHTTPRequestHandler):
+        def do_HEAD(self):
+            self.send_response(302, "Found")
+            self.send_header("Location", "http://localhost:7777/")
+            self.end_headers()
+
+        def do_GET(self):
+            self.send_response(200, "OK")
+            self.end_headers()
+
+        def log_date_time_string(self):
+            """Strip date and time from logged messages for assertions."""
+            return ""
+
+    with http_server(RedirectLoopOnHEADHandler):
+        app.builder.build_all()
+    _stdout, stderr = capsys.readouterr()
+    content = (app.outdir / 'output.txt').read_text()
+    assert content == ""
+    lines = stderr.splitlines()
+    assert len(lines) > 2
+    assert lines[:-1] == [
+        '127.0.0.1 - - [] "HEAD / HTTP/1.1" 302 -' for _ in lines[:-1]
+    ]
+    assert lines[-1] == '127.0.0.1 - - [] "GET / HTTP/1.1" 200 -'
+
+
 class OKHandler(http.server.BaseHTTPRequestHandler):
     def do_HEAD(self):
         self.send_response(200, "OK")
