@@ -40,6 +40,8 @@ Features added
 Bugs fixed
 ----------
 
+* #121: linkcheck: Validate local links against files in the output directory.
+
 * #7886: autodoc: TypeError is raised on mocking generic-typed classes
 * #7935: autodoc: function signature is not shown when the function has a
   parameter having ``inspect._empty`` as its default value

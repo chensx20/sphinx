@@ -9,6 +9,7 @@
 """
 
 import json
+import posixpath
 import queue
 import re
 import socket
@@ -16,7 +17,7 @@ import threading
 from html.parser import HTMLParser
 from os import path
 from typing import Any, Dict, List, Set, Tuple
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, urlparse, urlsplit
 
 from docutils import nodes
 from docutils.nodes import Node
@@ -213,7 +214,40 @@ class CheckExternalLinksBuilder(Builder):
             if len(uri) == 0 or uri.startswith(('#', 'mailto:', 'ftp:')):
                 return 'unchecked', '', 0
             elif not uri.startswith(('http:', 'https:')):
-                return 'local', '', 0
+                if uri.startswith('//') or re.match(r'^[a-zA-Z][a-zA-Z0-9+.-]*:', uri):
+                    return 'local', '', 0
+                for rex in self.to_ignore:
+                    if rex.match(uri):
+                        return 'ignored', '', 0
+                try:
+                    local_path = unquote(urlsplit(uri).path)
+                except ValueError as err:
+                    return 'broken', str(err), 0
+
+                suffix = self.config.html_file_suffix
+                if suffix is None:
+                    suffix = '.html'
+                current_path = posixpath.join(posixpath.dirname(docname),
+                                              posixpath.basename(docname) + suffix)
+                if not local_path:
+                    target_path = current_path
+                else:
+                    target_path = ''
+                if not target_path and (local_path.endswith('/') or
+                                        not posixpath.splitext(local_path)[1]):
+                    target_doc = posixpath.normpath(posixpath.join(
+                        posixpath.dirname(docname), local_path, 'index'))
+                    target_path = target_doc + suffix
+                elif not target_path:
+                    target_path = posixpath.normpath(posixpath.join(
+                        posixpath.dirname(current_path), local_path))
+                output_root = path.abspath(self.outdir)
+                output_path = path.abspath(path.join(output_root, target_path))
+                if target_path != '..' and not target_path.startswith('../') and \
+                        path.isfile(output_path):
+                    return 'local', '', 0
+                else:
+                    return 'broken', __('target not found'), 0
             elif uri in self.good:
                 return 'working', 'old', 0
             elif uri in self.broken:
@@ -275,6 +309,7 @@ class CheckExternalLinksBuilder(Builder):
             logger.info(darkgreen('ok        ') + uri + info)
             self.write_linkstat(linkstat)
         elif status == 'broken':
+            self.app.statuscode = 1
             if self.app.quiet or self.app.warningiserror:
                 logger.warning(__('broken link: %s (%s)'), uri, info,
                                location=(filename, lineno))
