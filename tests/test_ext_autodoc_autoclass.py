@@ -327,3 +327,17 @@ def test_class_alias(app):
         '',
         '   alias of :class:`target.classes.Foo`',
     ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_class_alias_with_variable_comment(app):
+    actual = do_autodoc(app, 'class', 'target.classes.AliasWithComment')
+    assert list(actual) == [
+        '',
+        '.. py:attribute:: AliasWithComment',
+        '   :module: target.classes',
+        '',
+        '   A multiline comment for an aliased class.',
+        '   The second line must also be rendered.',
+        '',
+    ]

@@ -30,3 +30,7 @@ class Quux(List[Union[int, float]]):
 
 
 Alias = Foo
+
+#: A multiline comment for an aliased class.
+#: The second line must also be rendered.
+AliasWithComment = Foo
