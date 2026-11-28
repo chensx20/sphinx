@@ -9,6 +9,8 @@
     :license: BSD, see LICENSE for details.
 """
 
+import sys
+
 import pytest
 
 from sphinx.ext.autodoc.importer import get_class_members
@@ -62,9 +64,31 @@ def test_abstract_classmethod_property(app):
     ]
 
 
+@pytest.mark.skipif(sys.version_info < (3, 8),
+                    reason='cached_property is available since python3.8.')
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_classmethod_cached_property(app):
+    actual = do_autodoc(app, 'property', 'target.classmethod_property.Cached.prop')
+    assert list(actual) == [
+        '',
+        '.. py:property:: Cached.prop',
+        '   :module: target.classmethod_property',
+        '   :classmethod:',
+        '',
+        '   cached property',
+        '',
+    ]
+
+
 @pytest.mark.sphinx('html', testroot='ext-autodoc')
 def test_classmethod_property_member(app):
     from target.classmethod_property import Concrete
 
     members = get_class_members(Concrete, [], safe_getattr)
     assert isinstance(members['prop'].object, classmethod)
+
+    if sys.version_info >= (3, 8):
+        from target.classmethod_property import Cached
+
+        members = get_class_members(Cached, [], safe_getattr)
+        assert isinstance(members['prop'].object, classmethod)

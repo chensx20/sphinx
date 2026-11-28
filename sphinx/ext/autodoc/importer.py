@@ -18,7 +18,7 @@ from sphinx.ext.autodoc.mock import ismock, undecorate
 from sphinx.pycode import ModuleAnalyzer, PycodeError
 from sphinx.util import logging
 from sphinx.util.inspect import (getannotations, getmro, getslots, isclass, isenumclass,
-                                 safe_getattr)
+                                 isproperty, safe_getattr)
 
 if False:
     # For type annotation
@@ -341,7 +341,7 @@ def get_classmethod_property(subject: Any, name: str) -> Optional[classmethod]:
         if name in cls.__dict__:
             descriptor = cls.__dict__[name]
             if (isinstance(descriptor, classmethod) and
-                    isinstance(descriptor.__func__, property)):
+                    isproperty(descriptor.__func__)):
                 return descriptor
             return None
 
