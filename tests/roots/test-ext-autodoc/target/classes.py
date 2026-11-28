@@ -34,3 +34,14 @@ Alias = Foo
 #: A multiline comment for an aliased class.
 #: The second line must also be rendered.
 AliasWithComment = Foo
+
+#: A module-level comment that does not belong to Outer.AliasWithoutComment.
+AliasWithoutComment = Foo
+
+
+class Outer:
+    #: A nested multiline comment for an aliased class.
+    #: The nested second line must also be rendered.
+    AliasWithComment = Foo
+
+    AliasWithoutComment = Foo

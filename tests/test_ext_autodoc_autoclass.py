@@ -341,3 +341,29 @@ def test_class_alias_with_variable_comment(app):
         '   The second line must also be rendered.',
         '',
     ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_nested_class_alias_with_variable_comment(app):
+    actual = do_autodoc(app, 'class', 'target.classes.Outer.AliasWithComment')
+    assert list(actual) == [
+        '',
+        '.. py:attribute:: AliasWithComment',
+        '   :module: target.classes.Outer',
+        '',
+        '   A nested multiline comment for an aliased class.',
+        '   The nested second line must also be rendered.',
+        '',
+    ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_nested_class_alias_ignores_module_variable_comment(app):
+    actual = do_autodoc(app, 'class', 'target.classes.Outer.AliasWithoutComment')
+    assert list(actual) == [
+        '',
+        '.. py:attribute:: AliasWithoutComment',
+        '   :module: target.classes.Outer',
+        '',
+        '   alias of :class:`target.classes.Foo`',
+    ]

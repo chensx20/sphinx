@@ -1675,9 +1675,16 @@ class ClassDocumenter(DocstringSignatureMixin, ModuleLevelDocumenter):  # type: 
 
     def get_module_comment(self, attrname: str) -> Optional[List[str]]:
         try:
-            analyzer = ModuleAnalyzer.for_module(self.modname)
+            if inspect.isclass(self.parent):
+                modname = self.parent.__module__
+                namespace = '.'.join([self.parent.__qualname__] + self.objpath[:-1])
+            else:
+                modname = self.modname
+                namespace = '.'.join(self.objpath[:-1])
+
+            analyzer = ModuleAnalyzer.for_module(modname)
             analyzer.analyze()
-            key = ('', attrname)
+            key = (namespace, self.objpath[-1])
             if key in analyzer.attr_docs:
                 return list(analyzer.attr_docs[key])
         except PycodeError:
@@ -1740,6 +1747,7 @@ class ClassDocumenter(DocstringSignatureMixin, ModuleLevelDocumenter):  # type: 
     def add_content(self, more_content: Optional[StringList], no_docstring: bool = False
                     ) -> None:
         if self.doc_as_attr:
+            self.analyzer = None
             if not self.get_module_comment(self.objpath[-1]):
                 try:
                     more_content = StringList([_('alias of %s') % restify(self.object)],
