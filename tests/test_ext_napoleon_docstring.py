@@ -17,15 +17,18 @@ from textwrap import dedent
 from unittest import TestCase, mock
 
 import pytest
+from docutils import nodes
 
+from sphinx import addnodes
 from sphinx.ext.napoleon import Config
-from sphinx.ext.napoleon.docstring import GoogleDocstring, NumpyDocstring
 from sphinx.ext.napoleon.docstring import (
     _tokenize_type_spec,
     _recombine_set_tokens,
     _convert_numpy_type_spec,
     _token_type
 )
+from sphinx.ext.napoleon.docstring import GoogleDocstring, NumpyDocstring
+from sphinx.testing import restructuredtext
 
 
 class NamedtupleSubclass(namedtuple('NamedtupleSubclass', ('attr1', 'attr2'))):
@@ -51,6 +54,11 @@ class NamedtupleSubclass(namedtuple('NamedtupleSubclass', ('attr1', 'attr2'))):
 
 class BaseDocstringTest(TestCase):
     pass
+
+
+@pytest.fixture
+def napoleon_test_app(request, app):
+    request.instance.app = app
 
 
 class NamedtupleSubclassTest(BaseDocstringTest):
@@ -1230,7 +1238,7 @@ class NumpyDocstringTest(BaseDocstringTest):
         """
         Single line summary
 
-        :Parameters: * **arg1** (*str*) -- Extended description of arg1
+        :Parameters: * **arg1** (:class:`str`) -- Extended description of arg1
                      * **\\*args, \\*\\*kwargs** -- Variable length argument list and arbitrary keyword arguments.
         """
     ), (
@@ -1266,6 +1274,150 @@ class NumpyDocstringTest(BaseDocstringTest):
                  description of yielded value
         """
     )]
+
+    def test_grouped_parameter_names(self):
+        for use_param in (True, False):
+            for optional in (False, True):
+                self._assert_grouped_parameter_names(use_param, optional)
+
+        config = Config()
+        actual = str(NumpyDocstring('''Parameters
+----------
+x1,  x2 , x3 : array_like
+    shared description
+next : int
+    next description''', config))
+        assert ':param x3: shared description' in actual
+        assert ':param next: next description' in actual
+        assert (actual.index(':param x1:') < actual.index(':param x2:') <
+                actual.index(':param x3:'))
+
+    def test_grouped_parameter_names_escape_each_name(self):
+        config = Config()
+        actual = str(NumpyDocstring('''Parameters
+----------
+x,*args : int
+    description''', config))
+        assert ':param x: description' in actual
+        assert r':param \*args: description' in actual
+
+        config = Config(strip_signature_backslash=True)
+        actual = str(NumpyDocstring('''Parameters
+----------
+x, y_ , z : int
+    description''', config))
+        assert ':param x: description' in actual
+        assert r':param y\_: description' in actual
+        assert ':param z: description' in actual
+
+    @pytest.mark.usefixtures('napoleon_test_app')
+    def test_grouped_parameter_names_rendered_doctree_and_edges(self):
+        config = Config(napoleon_use_param=True,
+                        napoleon_type_aliases={'Array': 'numpy.ndarray'})
+        source = '''Parameters
+----------
+a, b : Array, optional
+    first line
+
+    * list item
+
+    ``literal``
+missing_type, missing_desc
+empty :
+comma_type, comma_type2 : Union[int, str]
+    shared
+multiline1, multiline2 : int
+    first paragraph
+
+    second paragraph
+lists1, lists2 : int
+    * item
+literals1, literals2 : int
+    ``literal``
+
+Returns
+-------
+int
+    unchanged section'''
+        rendered = str(NumpyDocstring(source, config))
+        expected = '''\
+:param a: first line
+
+          * list item
+
+          ``literal``
+:type a: :class:`numpy.ndarray`, *optional*
+:param b: first line
+
+          * list item
+
+          ``literal``
+:type b: :class:`numpy.ndarray`, *optional*
+:param missing_type:
+:param missing_desc:
+:param empty:
+:param comma_type: shared
+:type comma_type: :class:`Union[int`, :class:`str]`
+:param comma_type2: shared
+:type comma_type2: :class:`Union[int`, :class:`str]`
+:param multiline1: first paragraph
+
+                   second paragraph
+:type multiline1: :class:`int`
+:param multiline2: first paragraph
+
+                   second paragraph
+:type multiline2: :class:`int`
+:param lists1:
+               * item
+:type lists1: :class:`int`
+:param lists2:
+               * item
+:type lists2: :class:`int`
+:param literals1: ``literal``
+:type literals1: :class:`int`
+:param literals2: ``literal``
+:type literals2: :class:`int`
+
+:returns: unchanged section
+:rtype: int
+'''
+        assert rendered == expected
+
+        text = '.. default-domain:: py\n\n.. py:function:: sample()\n\n' + ''.join(
+            '   ' + line + '\n' for line in rendered.splitlines()
+        )
+        doctree = restructuredtext.parse(self.app, text)
+        names = [node.astext() for node in doctree.traverse(addnodes.literal_strong)]
+        assert names.count('a') == 1
+        assert names.count('b') == 1
+        assert names.count('comma_type') == 1
+        assert names.count('comma_type2') == 1
+        assert len(list(doctree.traverse(nodes.bullet_list))) == 5
+        literals = [node.astext() for node in doctree.traverse(nodes.literal)]
+        assert literals.count('literal') == 4
+        assert not list(doctree.traverse(nodes.problematic))
+        assert 'unchanged section' in doctree.astext()
+
+    def _assert_grouped_parameter_names(self, use_param, optional):
+        type_spec = 'array_like, optional' if optional else 'array_like'
+        config = Config(napoleon_use_param=use_param)
+        docstring = '''Parameters
+----------
+x1, x2 : %s
+    shared description
+''' % type_spec
+        actual = str(NumpyDocstring(docstring, config))
+        if use_param:
+            expected = ''':param x1: shared description
+:type x1: :class:`array_like`{optional}
+:param x2: shared description
+:type x2: :class:`array_like`{optional}
+'''.format(optional=', *optional*' if optional else '')
+        else:
+            expected = ''':Parameters: **x1, x2** (:class:`array_like`%s) -- shared description
+''' % (', *optional*' if optional else '')
+        assert actual == expected
 
     def test_sphinx_admonitions(self):
         admonition_map = {

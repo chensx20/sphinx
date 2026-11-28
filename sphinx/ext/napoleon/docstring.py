@@ -1089,25 +1089,43 @@ class NumpyDocstring(GoogleDocstring):
 
     def _consume_field(self, parse_type: bool = True, prefer_type: bool = False
                        ) -> Tuple[str, str, List[str]]:
+        _name, _type, _desc = self._consume_numpy_field(parse_type)
+        _name = self._escape_args_and_kwargs(_name)
+        if prefer_type and not _type:
+            _type, _name = _name, _type
+        return _name, _type, _desc
+
+    def _consume_numpy_field(self, parse_type: bool = True) -> Tuple[str, str, List[str]]:
         line = next(self._line_iter)
         if parse_type:
             _name, _, _type = self._partition_field_on_colon(line)
         else:
             _name, _type = line, ''
         _name, _type = _name.strip(), _type.strip()
-        _name = self._escape_args_and_kwargs(_name)
         _type = _convert_numpy_type_spec(
             _type,
             location=self._get_location(),
             translations=self._config.napoleon_type_aliases or {},
         )
-
-        if prefer_type and not _type:
-            _type, _name = _name, _type
         indent = self._get_indent(line) + 1
         _desc = self._dedent(self._consume_indented_block(indent))
         _desc = self.__class__(_desc, self._config).lines()
         return _name, _type, _desc
+
+    def _parse_parameters_section(self, section: str) -> List[str]:
+        if self._config.napoleon_use_param:
+            expanded_fields = []
+            self._consume_empty()
+            while not self._is_section_break():
+                _name, _type, _desc = self._consume_numpy_field()
+                if _name or _type or _desc:
+                    expanded_fields.extend(
+                        (self._escape_args_and_kwargs(name.strip()), _type, _desc)
+                        for name in _name.split(',')
+                    )
+            return self._format_docutils_params(expanded_fields)
+        fields = self._consume_fields()
+        return self._format_fields(_('Parameters'), fields)
 
     def _consume_returns_section(self) -> List[Tuple[str, str, List[str]]]:
         return self._consume_fields(prefer_type=True)
