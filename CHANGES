@@ -16,6 +16,8 @@ Features added
 Bugs fixed
 ----------
 
+* #72: autodoc: Document properties decorated with ``@classmethod``
+
 Testing
 --------
 

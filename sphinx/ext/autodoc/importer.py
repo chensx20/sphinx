@@ -107,7 +107,11 @@ def import_object(modname: str, objpath: List[str], objtype: str = '',
             parent = obj
             logger.debug('[autodoc] getattr(_, %r)', attrname)
             mangled_name = mangle(obj, attrname)
-            obj = attrgetter(obj, mangled_name)
+            classmethod_property = get_classmethod_property(obj, mangled_name)
+            if classmethod_property:
+                obj = classmethod_property
+            else:
+                obj = attrgetter(obj, mangled_name)
 
             try:
                 logger.debug('[autodoc] => %r', obj)
@@ -274,7 +278,11 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
     # other members
     for name in dir(subject):
         try:
-            value = attrgetter(subject, name)
+            classmethod_property = get_classmethod_property(subject, name)
+            if classmethod_property:
+                value = classmethod_property
+            else:
+                value = attrgetter(subject, name)
             if ismock(value):
                 value = undecorate(value)
 
@@ -322,3 +330,19 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
         pass
 
     return members
+
+
+def get_classmethod_property(subject: Any, name: str) -> Optional[classmethod]:
+    """Return the raw classmethod descriptor when it wraps a property."""
+    if not isclass(subject):
+        return None
+
+    for cls in getmro(subject):
+        if name in cls.__dict__:
+            descriptor = cls.__dict__[name]
+            if (isinstance(descriptor, classmethod) and
+                    isinstance(descriptor.__func__, property)):
+                return descriptor
+            return None
+
+    return None

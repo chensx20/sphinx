@@ -11,6 +11,9 @@
 
 import pytest
 
+from sphinx.ext.autodoc.importer import get_class_members
+from sphinx.util.inspect import safe_getattr
+
 from .test_ext_autodoc import do_autodoc
 
 
@@ -26,3 +29,42 @@ def test_properties(app):
         '   docstring',
         '',
     ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_classmethod_property(app):
+    actual = do_autodoc(app, 'property', 'target.classmethod_property.Concrete.prop')
+    assert list(actual) == [
+        '',
+        '.. py:property:: Concrete.prop',
+        '   :module: target.classmethod_property',
+        '   :classmethod:',
+        '   :type: int',
+        '',
+        '   concrete property',
+        '',
+    ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_abstract_classmethod_property(app):
+    actual = do_autodoc(app, 'property', 'target.classmethod_property.Abstract.prop')
+    assert list(actual) == [
+        '',
+        '.. py:property:: Abstract.prop',
+        '   :module: target.classmethod_property',
+        '   :classmethod:',
+        '   :abstractmethod:',
+        '   :type: int',
+        '',
+        '   abstract property',
+        '',
+    ]
+
+
+@pytest.mark.sphinx('html', testroot='ext-autodoc')
+def test_classmethod_property_member(app):
+    from target.classmethod_property import Concrete
+
+    members = get_class_members(Concrete, [], safe_getattr)
+    assert isinstance(members['prop'].object, classmethod)
